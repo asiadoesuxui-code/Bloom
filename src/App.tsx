@@ -4,7 +4,7 @@ import { Chrome } from './components/Chrome';
 import { MosaicView } from './components/MosaicView';
 import { buildMosaicFromImageUrl, REVEAL_TOTAL_MS, type MosaicCell } from './lib/mosaic';
 import { loadResolvedTiles } from './lib/tileUrls';
-import { loadSourceUrls } from './lib/sources';
+import { loadSourceAssets } from './lib/sources';
 
 const BG_SWATCHES = ['#0e0f12', '#14161c', '#1a1424'] as const;
 const DEFAULT_BG = BG_SWATCHES[0]!;
@@ -14,7 +14,7 @@ type Phase = 'idle' | 'computing' | 'revealing' | 'done';
 export default function App() {
   const mosaicRef = useRef<HTMLDivElement>(null);
   const tiles = useMemo(() => loadResolvedTiles(), []);
-  const sourceUrls = useMemo(() => loadSourceUrls(), []);
+  const sourceAssets = useMemo(() => loadSourceAssets(), []);
 
   const [canvasBg, setCanvasBg] = useState(DEFAULT_BG);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -23,7 +23,7 @@ export default function App() {
   const [living, setLiving] = useState(false);
 
   const missingTiles = tiles.length === 0;
-  const missingSources = sourceUrls.length === 0;
+  const missingSources = sourceAssets.length === 0;
 
   useEffect(() => {
     if (phase !== 'revealing') return;
@@ -40,9 +40,10 @@ export default function App() {
     setLiving(false);
     setPhase('computing');
     setCells([]);
-    const choice = sourceUrls[Math.floor(Math.random() * sourceUrls.length)]!;
+    const choice = sourceAssets[Math.floor(Math.random() * sourceAssets.length)]!;
     try {
-      const built = await buildMosaicFromImageUrl(choice, tiles);
+      const varietySeed = Math.floor(Math.random() * 0x7fff_ffff);
+      const built = await buildMosaicFromImageUrl(choice.url, tiles, varietySeed, choice.stem);
       setCells(built);
       setGenerationId((g) => g + 1);
       setPhase('revealing');
@@ -50,7 +51,7 @@ export default function App() {
       console.error(e);
       setPhase('idle');
     }
-  }, [missingTiles, missingSources, sourceUrls, tiles]);
+  }, [missingTiles, missingSources, sourceAssets, tiles]);
 
   const savePng = useCallback(async () => {
     const node = mosaicRef.current;
