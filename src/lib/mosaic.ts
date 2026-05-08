@@ -16,6 +16,10 @@ export const REVEAL_TOTAL_MS = 5000;
 export const REVEAL_TILE_DURATION_SEC = 0.2;
 /** Max per-cell time shift vs pure diagonal rank, as a fraction of stagger span (keeps TL→BR while adding irregularity). */
 export const REVEAL_CHAOS_FRAC = 0.14;
+/** Sinusoidal delay ripple along `cx + cy`; amplitude as fraction of stagger span (set `0` to disable). */
+export const REVEAL_RIPPLE_FRAC = 0.085;
+/** Ripple spatial frequency in rad per diagonal index — a few gentle bands across the grid. */
+export const REVEAL_RIPPLE_K = 0.2;
 
 export type MosaicCell = {
   cx: number;
@@ -299,6 +303,8 @@ export async function buildMosaicFromImageUrl(
   const maxRank = Math.max(1, totalCells - 1);
   const staggerSpanSec = REVEAL_TOTAL_MS / 1000 - REVEAL_TILE_DURATION_SEC;
   const chaosMaxSec = staggerSpanSec * REVEAL_CHAOS_FRAC;
+  const rippleMaxSec = staggerSpanSec * REVEAL_RIPPLE_FRAC;
+  const ripplePhiRad = ripplePhaseRad(varietySeed);
 
   const cells: MosaicCell[] = [];
   let processed = 0;
@@ -314,7 +320,12 @@ export async function buildMosaicFromImageUrl(
       const baseDelaySec = (rank / maxRank) * staggerSpanSec;
       const delaySec = Math.min(
         staggerSpanSec,
-        Math.max(0, baseDelaySec + revealChaosOffsetSec(cx, cy, varietySeed, chaosMaxSec)),
+        Math.max(
+          0,
+          baseDelaySec +
+            revealChaosOffsetSec(cx, cy, varietySeed, chaosMaxSec) +
+            revealRippleOffsetSec(cx, cy, ripplePhiRad, rippleMaxSec),
+        ),
       );
       const seed = hashSeed(cx, cy, choice.id);
       cells.push({
@@ -367,4 +378,15 @@ function revealChaosOffsetSec(cx: number, cy: number, varietySeed: number, maxOf
   const v = unitHash01(varietySeed, cx, cy, 0xf4a98d1d);
   const blended = u + v - 1;
   return blended * maxOffsetSec;
+}
+
+function ripplePhaseRad(varietySeed: number): number {
+  const u = Math.imul(varietySeed ^ 0x45d9f3b3, 0x9e3779b1) >>> 0;
+  return (u / 0x1_0000_0000) * Math.PI * 2;
+}
+
+/** Slow traveling bump along diagonals: sin((cx+cy)*k + φ) * amplitude. */
+function revealRippleOffsetSec(cx: number, cy: number, phiRad: number, amplitudeSec: number): number {
+  if (amplitudeSec <= 0) return 0;
+  return Math.sin((cx + cy) * REVEAL_RIPPLE_K + phiRad) * amplitudeSec;
 }
