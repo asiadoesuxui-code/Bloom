@@ -1,6 +1,6 @@
 import gsap from 'gsap';
-import { memo, forwardRef, useEffect, useMemo, useRef } from 'react';
-import { getLivingPulseParams } from '../animations/tileLiving';
+import { memo, forwardRef, useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { getLivingMotionParams } from '../animations/tileLiving';
 import { revealGsParamsFromSeed, revealMicroFromSeed } from '../animations/tileReveal';
 import type { MosaicCell } from '../lib/mosaic';
 import { GRID_H, GRID_W } from '../lib/waveOrder';
@@ -19,13 +19,20 @@ type TileProps = {
   genT0: number;
 };
 
+const LIVING_LAYER: CSSProperties = {
+  width: '100%',
+  height: '100%',
+  transformOrigin: '50% 50%',
+  willChange: 'transform',
+};
+
 const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
   const { cx, cy, url, delaySec, seed } = cell;
-  const livingOn = living && getLivingPulseParams(seed).type === 'pulseScale';
+  const livingOn = living;
   const { rotateDeg, yPercent } = revealMicroFromSeed(seed);
 
   const revealRef = useRef<HTMLDivElement>(null);
-  const innerRef = useRef<HTMLDivElement>(null);
+  const livingScaleRef = useRef<HTMLDivElement>(null);
 
   /** Spread tween registration across frames so one commit doesn’t freeze the tab */
   const deferFrames = Math.min(14, Math.floor((cy * GRID_W + cx) / 145));
@@ -93,29 +100,44 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
   }, [genT0, seed, delaySec, rotateDeg, yPercent, deferFrames]);
 
   useEffect(() => {
-    const innerEl = innerRef.current;
-    if (!innerEl) return;
+    const el = livingScaleRef.current;
+    if (!el) return;
+
+    const reset = () => {
+      gsap.killTweensOf(el);
+      gsap.set(el, { scale: 1 });
+    };
 
     if (!livingOn) {
-      gsap.killTweensOf(innerEl);
-      gsap.set(innerEl, { scale: 1 });
+      reset();
       return;
     }
 
-    const pulse = getLivingPulseParams(seed);
-    const legDur = pulse.cycleDurationSec / 2;
-    const tween = gsap.to(innerEl, {
-      scale: pulse.scalePeak,
-      duration: legDur,
-      ease: 'sine.inOut',
-      repeat: -1,
-      yoyo: true,
-      delay: pulse.phaseDelaySec,
-    });
+    const p = getLivingMotionParams(seed);
+    if (p.kind === 'static') {
+      reset();
+      return;
+    }
+
+    gsap.set(el, { transformOrigin: '50% 50%' });
+
+    const ease = p.kind === 'pulse' ? 'power2.inOut' : 'power3.inOut';
+    const tw = gsap.fromTo(
+      el,
+      { scale: 1 },
+      {
+        scale: p.scalePeak,
+        duration: p.scaleHalfSec,
+        delay: p.scalePhaseSec,
+        ease,
+        repeat: -1,
+        yoyo: true,
+      },
+    );
 
     return () => {
-      tween.kill();
-      gsap.set(innerEl, { scale: 1 });
+      tw.kill();
+      reset();
     };
   }, [livingOn, seed]);
 
@@ -140,14 +162,7 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
           willChange: 'transform, opacity',
         }}
       >
-        <div
-          ref={innerRef}
-          style={{
-            width: '100%',
-            height: '100%',
-            transformOrigin: '50% 50%',
-          }}
-        >
+        <div ref={livingScaleRef} style={LIVING_LAYER}>
           <img
             src={url}
             alt=""
