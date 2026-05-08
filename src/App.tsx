@@ -4,7 +4,7 @@ import { Chrome } from './components/Chrome';
 import { MosaicView } from './components/MosaicView';
 import { buildMosaicFromImageUrl, REVEAL_TOTAL_MS, type MosaicCell } from './lib/mosaic';
 import { loadResolvedTiles } from './lib/tileUrls';
-import { loadSourceAssets } from './lib/sources';
+import { loadSourceAssets, createFairSourcePicker, randomIntegerBelow } from './lib/sources';
 
 const BG_SWATCHES = ['#0e0f12', '#14161c', '#1a1424'] as const;
 const DEFAULT_BG = BG_SWATCHES[0]!;
@@ -15,6 +15,8 @@ export default function App() {
   const mosaicRef = useRef<HTMLDivElement>(null);
   const tiles = useMemo(() => loadResolvedTiles(), []);
   const sourceAssets = useMemo(() => loadSourceAssets(), []);
+  const sourcePicker = useMemo(() => createFairSourcePicker(sourceAssets), [sourceAssets]);
+  const lastPickedStemRef = useRef<string | null>(null);
 
   const [canvasBg, setCanvasBg] = useState(DEFAULT_BG);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -40,18 +42,20 @@ export default function App() {
     setLiving(false);
     setPhase('computing');
     setCells([]);
-    const choice = sourceAssets[Math.floor(Math.random() * sourceAssets.length)]!;
+    const choice = sourcePicker.peekNext(lastPickedStemRef.current);
     try {
-      const varietySeed = Math.floor(Math.random() * 0x7fff_ffff);
+      const varietySeed = randomIntegerBelow(0x7fff_ffff + 1);
       const built = await buildMosaicFromImageUrl(choice.url, tiles, varietySeed, choice.stem);
       setCells(built);
+      sourcePicker.advanceAfterSuccess();
+      lastPickedStemRef.current = choice.stem;
       setGenerationId((g) => g + 1);
       setPhase('revealing');
     } catch (e) {
       console.error(e);
       setPhase('idle');
     }
-  }, [missingTiles, missingSources, sourceAssets, tiles]);
+  }, [missingTiles, missingSources, sourcePicker, tiles]);
 
   const savePng = useCallback(async () => {
     const node = mosaicRef.current;

@@ -93,3 +93,70 @@ export function shouldSuppressConflictingEarthTones(r: number, g: number, b: num
 export function shouldSuppressBlueFamilies(r: number, g: number, b: number, lab: Oklab): boolean {
   return shouldSuppressConflictingEarthTones(r, g, b, lab);
 }
+
+/**
+ * True only for compressed dark sunflower seed disks — petals, leaves, sky, bright gold stay false
+ * so `sunflower` sources can ban `_brown` except in the nucleus.
+ */
+export function isSunflowerSeedCentreSample(r: number, g: number, b: number): boolean {
+  const minRg = Math.min(r, g);
+  if (minRg - b > 32 && r + g > 205) return false;
+
+  const sum = r + g + b;
+  if (sum > 302) return false;
+  if (r < 60) return false;
+
+  if (g > r + 14 && b < r + 20) return false;
+
+  // Grey / violet shadows on petals — not the seed plate
+  if (b > g - 5 && r < 138) return false;
+
+  if (r > 102 && r > g + 4 && r > b + 24 && sum < 232) return true;
+  if (r > 88 && r > g + 2 && r > b + 16 && sum < 208) return true;
+
+  if (r > 70 && r >= g - 10 && r > b + 9 && sum < 198) return true;
+
+  return false;
+}
+
+/** Sunlit petals: prefer `_yellow` over neighbouring warm families during sunflower tweaks. */
+export function isBrightGoldenFlowerSample(r: number, g: number, b: number): boolean {
+  const minRg = Math.min(r, g);
+  if (minRg - b < 24 || r + g < 268) return false;
+  return r > 102 && g > 92 && b < 146;
+}
+
+/** Sky / open shade pigments where *blue* ceramics are warranted (not teal leaf or grey shadow). */
+export function isClearlyBlueDominantSample(r: number, g: number, b: number): boolean {
+  if (b <= r + 18 || b <= g + 14) return false;
+
+  const greenExcess = g - 0.5 * (r + b);
+  if (g > r + 36 && r < 118 && greenExcess > 2 && b <= g + 52) return false;
+
+  if (b > r + 30 && b > g + 24) return true;
+  if (b > g + 10 && b > r + 22 && r + g + b > 305) return true;
+  if (b > 175 && r < 178 && g < 198 && r + g + b > 420) return true;
+
+  return false;
+}
+
+/**
+ * True scarlet / blood red / magenta bloom — excludes sunflower orange (high R and G together).
+ * Lets `_red` stay legal only when the sample is actually red-magenta, not gold.
+ */
+export function isClearlyScarletOrMagentaRedSample(r: number, g: number, b: number): boolean {
+  const sum = r + g + b;
+  const minRg = Math.min(r, g);
+  if (sum < 68) return false;
+
+  // Magenta / fuchsia leaning
+  if (r > 85 && b > g + 20 && r > g + 6 && b > 68) return true;
+
+  // True red / near-red: dominant R, subdued G vs orange blossom
+  if (r > g + 48 && r > b + 34 && r > 112) {
+    if (g > 118 && minRg - b > 28 && r < 246) return false;
+    return true;
+  }
+
+  return false;
+}

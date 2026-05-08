@@ -5,6 +5,10 @@ import {
   isBlueCeramicFamily,
   isBrownCeramicFamily,
   shouldSuppressConflictingEarthTones,
+  isBrightGoldenFlowerSample,
+  isClearlyBlueDominantSample,
+  isClearlyScarletOrMagentaRedSample,
+  isSunflowerSeedCentreSample,
 } from './sourceColorClassify';
 import { GRID_H, GRID_W, waveRankMap } from './waveOrder';
 
@@ -29,14 +33,26 @@ type TileMeta = MosaicTileLab & { colorKey: string };
 const FAMILY_DISTANCE_TIE_OKLAB2 = 0.00042;
 
 /** When the source photo is sunflower: nudge ceramic family picks away from `_brown`, toward `_yellow`. */
-const SUNFLOWER_FAMILY_PENALTY_BROWN_OKLAB2 = 0.00075;
-const SUNFLOWER_FAMILY_BONUS_YELLOW_OKLAB2 = 0.00055;
+const SUNFLOWER_FAMILY_PENALTY_BROWN_OKLAB2 = 0.00115;
+const SUNFLOWER_FAMILY_BONUS_YELLOW_OKLAB2 = 0.00075;
+/** Extra bias on illuminated yellow petals (`_brown` already dropped outside the seed disk). */
+const SUNFLOWER_GOLD_PETAL_EXTRA_YELLOW_OKLAB2 = 0.0005;
 
-function familyDistanceForRanking(d2: number, colorKey: string, sourceStem: string | undefined): number {
+function familyDistanceForRanking(
+  d2: number,
+  colorKey: string,
+  sourceStem: string | undefined,
+  r: number,
+  g: number,
+  b: number,
+): number {
   if (!sourceStem || sourceStem.toLowerCase() !== 'sunflower') return d2;
   let x = d2;
   if (colorKey === 'brown') x += SUNFLOWER_FAMILY_PENALTY_BROWN_OKLAB2;
   if (colorKey === 'yellow') x -= SUNFLOWER_FAMILY_BONUS_YELLOW_OKLAB2;
+  if (colorKey === 'yellow' && isBrightGoldenFlowerSample(r, g, b)) {
+    x -= SUNFLOWER_GOLD_PETAL_EXTRA_YELLOW_OKLAB2;
+  }
   return x < 0 ? 0 : x;
 }
 
@@ -107,17 +123,51 @@ function eligibleColorKeys(
   g: number,
   b: number,
   lab: Oklab,
+  sourceStem: string | undefined,
 ): Set<string> {
   const all = [...buckets.keys()];
   let keys = new Set(all);
 
+  const stem = sourceStem?.toLowerCase();
+  if (stem === 'sunflower' && !isSunflowerSeedCentreSample(r, g, b)) {
+    for (const k of [...keys]) {
+      if (isBrownCeramicFamily(k)) keys.delete(k);
+    }
+  }
+
+  /**
+   * Sunflower.png: warm petals satisfy `isWarmBrownOrangeSample`, which turns OFF global blue/brown
+   * suppression on foliage rules — so `_darkblue` / `_red` can win on luminance. Drop them unless
+   * the cell is actually blue- or true-red-dominant.
+   */
+  if (stem === 'sunflower') {
+    if (!isClearlyScarletOrMagentaRedSample(r, g, b)) {
+      keys.delete('red');
+    }
+    if (!isClearlyBlueDominantSample(r, g, b)) {
+      for (const k of [...keys]) {
+        if (isBlueCeramicFamily(k)) keys.delete(k);
+      }
+    }
+  }
+
+  /** three.png / five.png: teal foliage averages should stay on `_green` / `_lightgreen`, not aqua `_seagreen`. */
+  const leafyGreenMixNoSeagreen = stem === 'three' || stem === 'five';
+
   if (shouldRestrictToLeafyGreenFamilies(r, g, b, lab)) {
-    keys = new Set(all.filter((k) => k === 'green' || k === 'lightgreen' || k === 'seagreen'));
+    const leafKeys = leafyGreenMixNoSeagreen
+      ? new Set<string>(['green', 'lightgreen'])
+      : new Set<string>(['green', 'lightgreen', 'seagreen']);
+    keys = new Set(all.filter((k) => leafKeys.has(k)));
     if (keys.size === 0) keys = new Set(all);
   } else if (shouldSuppressConflictingEarthTones(r, g, b, lab)) {
     for (const k of [...keys]) {
       if (isBlueCeramicFamily(k) || isBrownCeramicFamily(k)) keys.delete(k);
     }
+  }
+
+  if (leafyGreenMixNoSeagreen) {
+    keys.delete('seagreen');
   }
 
   if (keys.size === 0) return new Set(all);
@@ -136,14 +186,14 @@ function pickTileForPixel(
 ): TileMeta | null {
   const sampleLab = rgbToOklab(r, g, b);
 
-  let eligible = eligibleColorKeys(buckets, r, g, b, sampleLab);
+  let eligible = eligibleColorKeys(buckets, r, g, b, sampleLab, sourceStem);
 
   const famDists: { key: string; d2: number }[] = [];
   for (const key of eligible) {
     const fam = buckets.get(key);
     if (!fam || fam.length === 0) continue;
     const rawD2 = nearestInFamily(sampleLab, fam);
-    famDists.push({ key, d2: familyDistanceForRanking(rawD2, key, sourceStem) });
+    famDists.push({ key, d2: familyDistanceForRanking(rawD2, key, sourceStem, r, g, b) });
   }
 
   if (famDists.length === 0) {
@@ -151,7 +201,7 @@ function pickTileForPixel(
       const fam = buckets.get(key);
       if (!fam || fam.length === 0) continue;
       const rawD2 = nearestInFamily(sampleLab, fam);
-      famDists.push({ key, d2: familyDistanceForRanking(rawD2, key, sourceStem) });
+      famDists.push({ key, d2: familyDistanceForRanking(rawD2, key, sourceStem, r, g, b) });
     }
   }
 
