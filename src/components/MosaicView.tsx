@@ -1,9 +1,9 @@
 import { memo, forwardRef } from 'react';
 import { motion } from 'framer-motion';
 import { getLivingMotion } from '../animations/tileLiving';
+import { revealMicroFromSeed, revealTransitionFromSeed } from '../animations/tileReveal';
 import type { MosaicCell } from '../lib/mosaic';
 import { GRID_H, GRID_W } from '../lib/waveOrder';
-import { REVEAL_TILE_DURATION_SEC } from '../lib/mosaic';
 
 export type MosaicViewProps = {
   generationId: number;
@@ -22,6 +22,7 @@ const BloomTile = memo(function BloomTile({ cell, living }: TileProps) {
   const { cx, cy, url, delaySec, seed } = cell;
   const livingPreset = getLivingMotion(seed);
   const livingOn = living && livingPreset.type === 'pulseScale';
+  const { rotateDeg, yPercent } = revealMicroFromSeed(seed);
 
   return (
     <div
@@ -40,13 +41,14 @@ const BloomTile = memo(function BloomTile({ cell, living }: TileProps) {
           height: '100%',
           transformOrigin: '50% 50%',
         }}
-        initial={{ opacity: 0, scale: 0.92 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{
-          duration: REVEAL_TILE_DURATION_SEC,
-          ease: 'easeOut',
-          delay: delaySec,
+        initial={{
+          opacity: 0,
+          scale: 0.92,
+          rotate: rotateDeg,
+          y: `${yPercent}%`,
         }}
+        animate={{ opacity: 1, scale: 1, rotate: 0, y: '0%' }}
+        transition={revealTransitionFromSeed(seed, delaySec)}
       >
         <motion.div
           style={{
