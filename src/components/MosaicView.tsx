@@ -175,30 +175,20 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0, rippleShell }: 
     };
   }, [livingOn, seed, livingParams, cx, cy, handRipple?.livingDampen]);
 
-  const inner = (
-    <div
-      ref={revealRef}
-      style={{
-        width: '100%',
-        height: '100%',
-        transformOrigin: '50% 50%',
-        opacity: 0,
-      }}
-    >
-      <div ref={livingScaleRef} style={LIVING_LAYER}>
-        <img
-          src={url}
-          alt=""
-          draggable={false}
-          decoding="async"
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'fill',
-            display: 'block',
-          }}
-        />
-      </div>
+  const livingLayer = (
+    <div ref={livingScaleRef} style={LIVING_LAYER}>
+      <img
+        src={url}
+        alt=""
+        draggable={false}
+        decoding="async"
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'fill',
+          display: 'block',
+        }}
+      />
     </div>
   );
 
@@ -214,7 +204,23 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0, rippleShell }: 
         zIndex: popsAboveGrid ? 4 + (seed & 31) : undefined,
       }}
     >
-      {rippleShell ? <HandRippleTileShell cx={cx} cy={cy}>{inner}</HandRippleTileShell> : inner}
+      <div
+        ref={revealRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          transformOrigin: '50% 50%',
+          opacity: 0,
+        }}
+      >
+        {rippleShell ? (
+          <HandRippleTileShell cx={cx} cy={cy} rippleActive={livingOn}>
+            {livingLayer}
+          </HandRippleTileShell>
+        ) : (
+          livingLayer
+        )}
+      </div>
     </div>
   );
 });

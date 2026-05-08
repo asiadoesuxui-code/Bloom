@@ -9,7 +9,7 @@ import { loadSourceAssets, createFairSourcePicker, randomIntegerBelow } from './
 import { useHandTrackingRuntime } from './handTracking/useHandTrackingRuntime';
 import { HandRippleProvider } from './handTracking/HandRippleContext';
 import { HandTrackingToggle } from './handTracking/HandTrackingToggle';
-import { HandTrackingPoc } from './handTracking/HandTrackingPoc';
+import { HandPocDevHud } from './handTracking/HandPocDevHud';
 
 const BG_SWATCHES = ['#0e0f12', '#14161c', '#1a1424'] as const;
 const DEFAULT_BG = BG_SWATCHES[0]!;
@@ -30,7 +30,7 @@ export default function App() {
   const [living, setLiving] = useState(false);
   const [handTracking, setHandTracking] = useState(false);
 
-  const showHandPoc =
+  const handPocMode =
     import.meta.env.DEV &&
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).has('handpoc');
@@ -39,7 +39,7 @@ export default function App() {
   const missingSources = sourceAssets.length === 0;
 
   const hasCells = cells.length > 0;
-  const handPipelineOn = handTracking && hasCells;
+  const handPipelineOn = hasCells && (handTracking || handPocMode);
 
   const handRt = useHandTrackingRuntime({
     enabled: handPipelineOn,
@@ -100,10 +100,6 @@ export default function App() {
   const computeBusy = phase === 'computing';
   const artworkReady = phase === 'done';
 
-  if (showHandPoc) {
-    return <HandTrackingPoc />;
-  }
-
   return (
     <HandRippleProvider
       enabled={handPipelineOn}
@@ -147,16 +143,28 @@ export default function App() {
             enabled={handTracking}
             onChange={setHandTracking}
             permissionDenied={handRt.error === 'denied'}
+            devPocUrl={handPocMode}
           />
 
           <div
             style={{
+              position: 'relative',
               width: 'min(100%, calc((100svh - 200px) * 16 / 9))',
               maxWidth: '100%',
               aspectRatio: '16 / 9',
               maxHeight: 'calc(100svh - 200px)',
+              borderRadius: 12,
+              outline: handPocMode && hasCells ? '1px dashed rgba(140,190,255,0.42)' : undefined,
+              outlineOffset: 4,
+              boxSizing: 'border-box',
             }}
           >
+            {handPocMode && (!computeBusy || hasCells) ? (
+              <HandPocDevHud
+                error={handRt.error}
+                waitingForMosaic={!hasCells && !computeBusy}
+              />
+            ) : null}
             <MosaicView
               ref={mosaicRef}
               generationId={generationId}

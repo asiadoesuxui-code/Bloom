@@ -8,9 +8,9 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { animate, motionValue, useTransform, type MotionValue, motion } from 'framer-motion';
+import { animate, motionValue, type MotionValue, motion } from 'framer-motion';
 import { GRID_H, GRID_W } from '../lib/waveOrder';
-import { rippleTargets } from './handRippleMath';
+import { rippleDisplacementPx } from './handRippleMath';
 import type { HandCanvasNorm } from './useHandTrackingRuntime';
 
 export function tileFlatIndex(cx: number, cy: number): number {
@@ -18,14 +18,13 @@ export function tileFlatIndex(cx: number, cy: number): number {
 }
 
 type MotionRegs = {
-  scale: MotionValue<number>;
-  rotate: MotionValue<number>;
-  brightness: MotionValue<number>;
+  tx: MotionValue<number>;
+  ty: MotionValue<number>;
 };
 
 type Entry = MotionRegs & { cx: number; cy: number };
 
-const SPRING = { type: 'spring' as const, stiffness: 200, damping: 24, mass: 0.4 };
+const DISPLACE_SPRING = { type: 'spring' as const, stiffness: 380, damping: 34, mass: 0.32 };
 
 type HandRippleInner = {
   enabled: boolean;
@@ -91,15 +90,13 @@ export function HandRippleProvider({
 
       const w = rect.width;
       const h = rect.height;
-      const R = Math.min(w, h) * 0.2;
       const tsec = performance.now() / 1000;
 
       if (!hand) {
         if (hadHand) {
           for (const [, e] of reg) {
-            animate(e.scale, 1, SPRING);
-            animate(e.rotate, 0, SPRING);
-            animate(e.brightness, 1, SPRING);
+            animate(e.tx, 0, DISPLACE_SPRING);
+            animate(e.ty, 0, DISPLACE_SPRING);
           }
         }
         hadHand = false;
@@ -115,22 +112,23 @@ export function HandRippleProvider({
         const { cx, cy } = e;
         const tpx = ((cx + 0.5) / GRID_W) * w;
         const tpy = ((cy + 0.5) / GRID_H) * h;
-        const dist = Math.hypot(tpx - hx, tpy - hy);
-        const { influence, scale, rotateDeg, brightness } = rippleTargets({
-          distPx: dist,
-          radiusPx: R,
+        const { influence, dx, dy } = rippleDisplacementPx({
+          tileCxPx: tpx,
+          tileCyPx: tpy,
+          handHxPx: hx,
+          handHyPx: hy,
+          canvasW: w,
+          canvasH: h,
           timeSec: tsec,
         });
         dampen.current[tileFlatIndex(cx, cy)] = influence;
 
-        if (influence > 0.003) {
-          animate(e.scale, scale, SPRING);
-          animate(e.rotate, rotateDeg, SPRING);
-          animate(e.brightness, brightness, SPRING);
+        if (influence > 0.0025) {
+          animate(e.tx, dx, DISPLACE_SPRING);
+          animate(e.ty, dy, DISPLACE_SPRING);
         } else {
-          animate(e.scale, 1, SPRING);
-          animate(e.rotate, 0, SPRING);
-          animate(e.brightness, 1, SPRING);
+          animate(e.tx, 0, DISPLACE_SPRING);
+          animate(e.ty, 0, DISPLACE_SPRING);
         }
       }
 
@@ -156,29 +154,30 @@ export function HandRippleProvider({
 type ShellProps = {
   cx: number;
   cy: number;
+  /** Only after reveal — avoids Framer/filter layers (~2k tiles) during GSAP reveal */
+  rippleActive: boolean;
   children: ReactNode;
 };
 
-/** motion shell + register — wraps tile content without editing inner tile GSAP code paths beyond this hook */
-export function HandRippleTileShell({ cx, cy, children }: ShellProps) {
+/** motion shell + register — wraps the living/image layer inside reveal, not reveal itself */
+export function HandRippleTileShell({ cx, cy, rippleActive, children }: ShellProps) {
   const ctx = useHandRippleRegister();
 
-  const scaleMv = useMemo(() => motionValue(1), []);
-  const rotateMv = useMemo(() => motionValue(0), []);
-  const brightnessMv = useMemo(() => motionValue(1), []);
+  const txMv = useMemo(() => motionValue(0), []);
+  const tyMv = useMemo(() => motionValue(0), []);
 
   useEffect(() => {
-    if (!ctx?.enabled) return;
+    if (!ctx?.enabled || !rippleActive) return;
     return ctx.register(cx, cy, {
-      scale: scaleMv,
-      rotate: rotateMv,
-      brightness: brightnessMv,
+      tx: txMv,
+      ty: tyMv,
     });
-  }, [ctx, cx, cy, scaleMv, rotateMv, brightnessMv]);
-
-  const filt = useTransform(brightnessMv, (b) => `brightness(${b})`);
+  }, [ctx, rippleActive, cx, cy, txMv, tyMv]);
 
   if (!ctx?.enabled) return <>{children}</>;
+
+  /** Reveal phase: identical DOM depth as hand-tracking off (`revealRef` directly wraps the tile face). */
+  if (!rippleActive) return <>{children}</>;
 
   return (
     <motion.div
@@ -186,10 +185,10 @@ export function HandRippleTileShell({ cx, cy, children }: ShellProps) {
         width: '100%',
         height: '100%',
         transformOrigin: '50% 50%',
-        scale: scaleMv,
-        rotate: rotateMv,
-        filter: filt,
-        willChange: 'transform, filter',
+        backfaceVisibility: 'hidden',
+        x: txMv,
+        y: tyMv,
+        willChange: 'transform',
       }}
     >
       {children}
