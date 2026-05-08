@@ -23,13 +23,16 @@ const LIVING_LAYER: CSSProperties = {
   width: '100%',
   height: '100%',
   transformOrigin: '50% 50%',
-  willChange: 'transform',
+  backfaceVisibility: 'hidden',
+  borderRadius: 2,
 };
 
 const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
   const { cx, cy, url, delaySec, seed } = cell;
   const livingOn = living;
   const { rotateDeg, yPercent } = revealMicroFromSeed(seed);
+  const livingParams = useMemo(() => getLivingMotionParams(seed), [seed]);
+  const popsAboveGrid = livingOn && livingParams.kind !== 'static';
 
   const revealRef = useRef<HTMLDivElement>(null);
   const livingScaleRef = useRef<HTMLDivElement>(null);
@@ -105,7 +108,11 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
 
     const reset = () => {
       gsap.killTweensOf(el);
-      gsap.set(el, { scale: 1 });
+      gsap.set(el, {
+        scale: 1,
+        z: 0,
+        force3D: true,
+      });
     };
 
     if (!livingOn) {
@@ -113,25 +120,30 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
       return;
     }
 
-    const p = getLivingMotionParams(seed);
+    const p = livingParams;
     if (p.kind === 'static') {
       reset();
       return;
     }
 
-    gsap.set(el, { transformOrigin: '50% 50%' });
+    const zPeak = p.kind === 'pulse' ? 8 + (seed & 7) * 1.8 : 16 + (seed & 7) * 2.8;
+
+    gsap.set(el, { transformOrigin: '50% 50%', force3D: true });
 
     const ease = p.kind === 'pulse' ? 'power2.inOut' : 'power3.inOut';
+    /** Only transform props (GPU); skip box-shadow — it repaints every frame and tanks 2k tiles */
     const tw = gsap.fromTo(
       el,
-      { scale: 1 },
+      { scale: 1, z: 0 },
       {
         scale: p.scalePeak,
+        z: zPeak,
         duration: p.scaleHalfSec,
         delay: p.scalePhaseSec,
         ease,
         repeat: -1,
         yoyo: true,
+        force3D: true,
       },
     );
 
@@ -139,7 +151,7 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
       tw.kill();
       reset();
     };
-  }, [livingOn, seed]);
+  }, [livingOn, seed, livingParams]);
 
   return (
     <div
@@ -149,7 +161,8 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
         top: `${(cy * 100) / GRID_H}%`,
         width: `${100 / GRID_W}%`,
         height: `${100 / GRID_H}%`,
-        overflow: 'hidden',
+        overflow: popsAboveGrid ? 'visible' : 'hidden',
+        zIndex: popsAboveGrid ? 4 + (seed & 31) : undefined,
       }}
     >
       <div
@@ -159,7 +172,6 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
           height: '100%',
           transformOrigin: '50% 50%',
           opacity: 0,
-          willChange: 'transform, opacity',
         }}
       >
         <div ref={livingScaleRef} style={LIVING_LAYER}>
@@ -208,6 +220,9 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
             position: 'relative',
             width: '100%',
             height: '100%',
+            ...(living
+              ? { perspective: 900, transformStyle: 'preserve-3d' as const }
+              : {}),
           }}
         >
           {cells.map((cell) => (
