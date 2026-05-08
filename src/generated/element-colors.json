@@ -1,0 +1,1082 @@
+{
+  "tiles": [
+    {
+      "id": "bubble_lightblue",
+      "srcRelative": "elements/bubble_lightblue.png",
+      "r": 158,
+      "g": 185,
+      "b": 204
+    },
+    {
+      "id": "bubbles_beige",
+      "srcRelative": "elements/bubbles_beige.png",
+      "r": 198,
+      "g": 179,
+      "b": 153
+    },
+    {
+      "id": "bubbles_brown",
+      "srcRelative": "elements/bubbles_brown.png",
+      "r": 178,
+      "g": 108,
+      "b": 52
+    },
+    {
+      "id": "bubbles_darkblue",
+      "srcRelative": "elements/bubbles_darkblue.png",
+      "r": 43,
+      "g": 63,
+      "b": 109
+    },
+    {
+      "id": "bubbles_green",
+      "srcRelative": "elements/bubbles_green.png",
+      "r": 92,
+      "g": 138,
+      "b": 70
+    },
+    {
+      "id": "bubbles_lightgreen",
+      "srcRelative": "elements/bubbles_lightgreen.png",
+      "r": 168,
+      "g": 176,
+      "b": 90
+    },
+    {
+      "id": "bubbles_orange",
+      "srcRelative": "elements/bubbles_orange.png",
+      "r": 224,
+      "g": 134,
+      "b": 70
+    },
+    {
+      "id": "bubbles_pink",
+      "srcRelative": "elements/bubbles_pink.png",
+      "r": 203,
+      "g": 134,
+      "b": 139
+    },
+    {
+      "id": "bubbles_red",
+      "srcRelative": "elements/bubbles_red.png",
+      "r": 192,
+      "g": 88,
+      "b": 79
+    },
+    {
+      "id": "bubbles_seagreen",
+      "srcRelative": "elements/bubbles_seagreen.png",
+      "r": 46,
+      "g": 146,
+      "b": 145
+    },
+    {
+      "id": "bubbles_yellow",
+      "srcRelative": "elements/bubbles_yellow.png",
+      "r": 228,
+      "g": 171,
+      "b": 30
+    },
+    {
+      "id": "caro_beige",
+      "srcRelative": "elements/caro_beige.png",
+      "r": 210,
+      "g": 194,
+      "b": 176
+    },
+    {
+      "id": "caro_brown",
+      "srcRelative": "elements/caro_brown.png",
+      "r": 114,
+      "g": 68,
+      "b": 38
+    },
+    {
+      "id": "caro_darkblue",
+      "srcRelative": "elements/caro_darkblue.png",
+      "r": 22,
+      "g": 54,
+      "b": 113
+    },
+    {
+      "id": "caro_green",
+      "srcRelative": "elements/caro_green.png",
+      "r": 64,
+      "g": 109,
+      "b": 65
+    },
+    {
+      "id": "caro_lightblue",
+      "srcRelative": "elements/caro_lightblue.png",
+      "r": 156,
+      "g": 177,
+      "b": 185
+    },
+    {
+      "id": "caro_lightgreen",
+      "srcRelative": "elements/caro_lightgreen.png",
+      "r": 155,
+      "g": 162,
+      "b": 117
+    },
+    {
+      "id": "caro_orange",
+      "srcRelative": "elements/caro_orange.png",
+      "r": 221,
+      "g": 106,
+      "b": 44
+    },
+    {
+      "id": "caro_pink",
+      "srcRelative": "elements/caro_pink.png",
+      "r": 196,
+      "g": 144,
+      "b": 151
+    },
+    {
+      "id": "caro_red",
+      "srcRelative": "elements/caro_red.png",
+      "r": 142,
+      "g": 38,
+      "b": 39
+    },
+    {
+      "id": "caro_seagreen",
+      "srcRelative": "elements/caro_seagreen.png",
+      "r": 40,
+      "g": 124,
+      "b": 148
+    },
+    {
+      "id": "caro_yellow",
+      "srcRelative": "elements/caro_yellow.png",
+      "r": 235,
+      "g": 174,
+      "b": 56
+    },
+    {
+      "id": "chocolate_beige",
+      "srcRelative": "elements/chocolate_beige.png",
+      "r": 212,
+      "g": 194,
+      "b": 173
+    },
+    {
+      "id": "chocolate_brown",
+      "srcRelative": "elements/chocolate_brown.png",
+      "r": 123,
+      "g": 83,
+      "b": 57
+    },
+    {
+      "id": "chocolate_darkblue",
+      "srcRelative": "elements/chocolate_darkblue.png",
+      "r": 27,
+      "g": 55,
+      "b": 106
+    },
+    {
+      "id": "chocolate_green",
+      "srcRelative": "elements/chocolate_green.png",
+      "r": 69,
+      "g": 108,
+      "b": 75
+    },
+    {
+      "id": "chocolate_lightblue",
+      "srcRelative": "elements/chocolate_lightblue.png",
+      "r": 171,
+      "g": 192,
+      "b": 198
+    },
+    {
+      "id": "chocolate_lightgreen",
+      "srcRelative": "elements/chocolate_lightgreen.png",
+      "r": 165,
+      "g": 175,
+      "b": 138
+    },
+    {
+      "id": "chocolate_orange",
+      "srcRelative": "elements/chocolate_orange.png",
+      "r": 215,
+      "g": 115,
+      "b": 66
+    },
+    {
+      "id": "chocolate_pink",
+      "srcRelative": "elements/chocolate_pink.png",
+      "r": 205,
+      "g": 138,
+      "b": 155
+    },
+    {
+      "id": "chocolate_red",
+      "srcRelative": "elements/chocolate_red.png",
+      "r": 134,
+      "g": 43,
+      "b": 45
+    },
+    {
+      "id": "chocolate_seagreen",
+      "srcRelative": "elements/chocolate_seagreen.png",
+      "r": 32,
+      "g": 104,
+      "b": 126
+    },
+    {
+      "id": "chocolate_yellow",
+      "srcRelative": "elements/chocolate_yellow.png",
+      "r": 188,
+      "g": 134,
+      "b": 60
+    },
+    {
+      "id": "clover_beige",
+      "srcRelative": "elements/clover_beige.png",
+      "r": 213,
+      "g": 198,
+      "b": 180
+    },
+    {
+      "id": "clover_brown",
+      "srcRelative": "elements/clover_brown.png",
+      "r": 122,
+      "g": 78,
+      "b": 50
+    },
+    {
+      "id": "clover_darkblue",
+      "srcRelative": "elements/clover_darkblue.png",
+      "r": 10,
+      "g": 41,
+      "b": 106
+    },
+    {
+      "id": "clover_green",
+      "srcRelative": "elements/clover_green.png",
+      "r": 122,
+      "g": 148,
+      "b": 96
+    },
+    {
+      "id": "clover_lightblue",
+      "srcRelative": "elements/clover_lightblue.png",
+      "r": 169,
+      "g": 204,
+      "b": 228
+    },
+    {
+      "id": "clover_lightgreen",
+      "srcRelative": "elements/clover_lightgreen.png",
+      "r": 178,
+      "g": 183,
+      "b": 143
+    },
+    {
+      "id": "clover_orange",
+      "srcRelative": "elements/clover_orange.png",
+      "r": 239,
+      "g": 136,
+      "b": 103
+    },
+    {
+      "id": "clover_pink",
+      "srcRelative": "elements/clover_pink.png",
+      "r": 194,
+      "g": 123,
+      "b": 144
+    },
+    {
+      "id": "clover_red",
+      "srcRelative": "elements/clover_red.png",
+      "r": 147,
+      "g": 38,
+      "b": 40
+    },
+    {
+      "id": "clover_seagreen",
+      "srcRelative": "elements/clover_seagreen.png",
+      "r": 45,
+      "g": 124,
+      "b": 147
+    },
+    {
+      "id": "clover_yellow",
+      "srcRelative": "elements/clover_yellow.png",
+      "r": 195,
+      "g": 135,
+      "b": 51
+    },
+    {
+      "id": "flower4_beige",
+      "srcRelative": "elements/flower4_beige.png",
+      "r": 206,
+      "g": 187,
+      "b": 162
+    },
+    {
+      "id": "flower4_brown",
+      "srcRelative": "elements/flower4_brown.png",
+      "r": 130,
+      "g": 81,
+      "b": 54
+    },
+    {
+      "id": "flower4_darkblue",
+      "srcRelative": "elements/flower4_darkblue.png",
+      "r": 21,
+      "g": 41,
+      "b": 104
+    },
+    {
+      "id": "flower4_green",
+      "srcRelative": "elements/flower4_green.png",
+      "r": 73,
+      "g": 118,
+      "b": 66
+    },
+    {
+      "id": "flower4_lightblue",
+      "srcRelative": "elements/flower4_lightblue.png",
+      "r": 156,
+      "g": 188,
+      "b": 199
+    },
+    {
+      "id": "flower4_lightgreen",
+      "srcRelative": "elements/flower4_lightgreen.png",
+      "r": 145,
+      "g": 161,
+      "b": 112
+    },
+    {
+      "id": "flower4_orange",
+      "srcRelative": "elements/flower4_orange.png",
+      "r": 242,
+      "g": 130,
+      "b": 109
+    },
+    {
+      "id": "flower4_pink",
+      "srcRelative": "elements/flower4_pink.png",
+      "r": 188,
+      "g": 113,
+      "b": 133
+    },
+    {
+      "id": "flower4_red",
+      "srcRelative": "elements/flower4_red.png",
+      "r": 142,
+      "g": 49,
+      "b": 50
+    },
+    {
+      "id": "flower4_seagreen",
+      "srcRelative": "elements/flower4_seagreen.png",
+      "r": 40,
+      "g": 117,
+      "b": 142
+    },
+    {
+      "id": "flower4_yellow",
+      "srcRelative": "elements/flower4_yellow.png",
+      "r": 217,
+      "g": 167,
+      "b": 65
+    },
+    {
+      "id": "flower6_beige",
+      "srcRelative": "elements/flower6_beige.png",
+      "r": 212,
+      "g": 196,
+      "b": 175
+    },
+    {
+      "id": "flower6_brown",
+      "srcRelative": "elements/flower6_brown.png",
+      "r": 117,
+      "g": 85,
+      "b": 59
+    },
+    {
+      "id": "flower6_darkblue",
+      "srcRelative": "elements/flower6_darkblue.png",
+      "r": 21,
+      "g": 43,
+      "b": 102
+    },
+    {
+      "id": "flower6_green",
+      "srcRelative": "elements/flower6_green.png",
+      "r": 109,
+      "g": 134,
+      "b": 80
+    },
+    {
+      "id": "flower6_lightblue",
+      "srcRelative": "elements/flower6_lightblue.png",
+      "r": 167,
+      "g": 190,
+      "b": 197
+    },
+    {
+      "id": "flower6_lightgreen",
+      "srcRelative": "elements/flower6_lightgreen.png",
+      "r": 175,
+      "g": 178,
+      "b": 136
+    },
+    {
+      "id": "flower6_orange",
+      "srcRelative": "elements/flower6_orange.png",
+      "r": 221,
+      "g": 109,
+      "b": 56
+    },
+    {
+      "id": "flower6_pink",
+      "srcRelative": "elements/flower6_pink.png",
+      "r": 197,
+      "g": 144,
+      "b": 152
+    },
+    {
+      "id": "flower6_red",
+      "srcRelative": "elements/flower6_red.png",
+      "r": 143,
+      "g": 57,
+      "b": 58
+    },
+    {
+      "id": "flower6_seagreen",
+      "srcRelative": "elements/flower6_seagreen.png",
+      "r": 56,
+      "g": 124,
+      "b": 144
+    },
+    {
+      "id": "flower6_yellow",
+      "srcRelative": "elements/flower6_yellow.png",
+      "r": 233,
+      "g": 176,
+      "b": 38
+    },
+    {
+      "id": "indent_beige",
+      "srcRelative": "elements/indent_beige.png",
+      "r": 183,
+      "g": 157,
+      "b": 126
+    },
+    {
+      "id": "indent_brown",
+      "srcRelative": "elements/indent_brown.png",
+      "r": 131,
+      "g": 83,
+      "b": 53
+    },
+    {
+      "id": "indent_darkblue",
+      "srcRelative": "elements/indent_darkblue.png",
+      "r": 54,
+      "g": 75,
+      "b": 128
+    },
+    {
+      "id": "indent_green",
+      "srcRelative": "elements/indent_green.png",
+      "r": 73,
+      "g": 115,
+      "b": 78
+    },
+    {
+      "id": "indent_lightblue",
+      "srcRelative": "elements/indent_lightblue.png",
+      "r": 150,
+      "g": 177,
+      "b": 185
+    },
+    {
+      "id": "indent_lightgreen",
+      "srcRelative": "elements/indent_lightgreen.png",
+      "r": 141,
+      "g": 149,
+      "b": 85
+    },
+    {
+      "id": "indent_orange",
+      "srcRelative": "elements/indent_orange.png",
+      "r": 185,
+      "g": 93,
+      "b": 29
+    },
+    {
+      "id": "indent_pink",
+      "srcRelative": "elements/indent_pink.png",
+      "r": 168,
+      "g": 97,
+      "b": 115
+    },
+    {
+      "id": "indent_red",
+      "srcRelative": "elements/indent_red.png",
+      "r": 139,
+      "g": 54,
+      "b": 55
+    },
+    {
+      "id": "indent_seagreen",
+      "srcRelative": "elements/indent_seagreen.png",
+      "r": 52,
+      "g": 105,
+      "b": 120
+    },
+    {
+      "id": "indent_yellow",
+      "srcRelative": "elements/indent_yellow.png",
+      "r": 200,
+      "g": 144,
+      "b": 69
+    },
+    {
+      "id": "leaf_beige",
+      "srcRelative": "elements/leaf_beige.png",
+      "r": 198,
+      "g": 174,
+      "b": 143
+    },
+    {
+      "id": "leaf_brown",
+      "srcRelative": "elements/leaf_brown.png",
+      "r": 123,
+      "g": 83,
+      "b": 57
+    },
+    {
+      "id": "leaf_darkblue",
+      "srcRelative": "elements/leaf_darkblue.png",
+      "r": 29,
+      "g": 62,
+      "b": 111
+    },
+    {
+      "id": "leaf_green",
+      "srcRelative": "elements/leaf_green.png",
+      "r": 70,
+      "g": 105,
+      "b": 52
+    },
+    {
+      "id": "leaf_lightblue",
+      "srcRelative": "elements/leaf_lightblue.png",
+      "r": 181,
+      "g": 200,
+      "b": 205
+    },
+    {
+      "id": "leaf_lightgreen",
+      "srcRelative": "elements/leaf_lightgreen.png",
+      "r": 141,
+      "g": 161,
+      "b": 96
+    },
+    {
+      "id": "leaf_orange",
+      "srcRelative": "elements/leaf_orange.png",
+      "r": 212,
+      "g": 111,
+      "b": 47
+    },
+    {
+      "id": "leaf_pink",
+      "srcRelative": "elements/leaf_pink.png",
+      "r": 185,
+      "g": 126,
+      "b": 135
+    },
+    {
+      "id": "leaf_red",
+      "srcRelative": "elements/leaf_red.png",
+      "r": 197,
+      "g": 92,
+      "b": 85
+    },
+    {
+      "id": "leaf_seagreen",
+      "srcRelative": "elements/leaf_seagreen.png",
+      "r": 28,
+      "g": 99,
+      "b": 113
+    },
+    {
+      "id": "leaf_yellow",
+      "srcRelative": "elements/leaf_yellow.png",
+      "r": 202,
+      "g": 148,
+      "b": 58
+    },
+    {
+      "id": "mosaic_beige",
+      "srcRelative": "elements/mosaic_beige.png",
+      "r": 190,
+      "g": 177,
+      "b": 158
+    },
+    {
+      "id": "mosaic_brown",
+      "srcRelative": "elements/mosaic_brown.png",
+      "r": 146,
+      "g": 102,
+      "b": 77
+    },
+    {
+      "id": "mosaic_darkblue",
+      "srcRelative": "elements/mosaic_darkblue.png",
+      "r": 71,
+      "g": 109,
+      "b": 154
+    },
+    {
+      "id": "mosaic_green",
+      "srcRelative": "elements/mosaic_green.png",
+      "r": 93,
+      "g": 138,
+      "b": 101
+    },
+    {
+      "id": "mosaic_lightblue",
+      "srcRelative": "elements/mosaic_lightblue.png",
+      "r": 185,
+      "g": 207,
+      "b": 219
+    },
+    {
+      "id": "mosaic_lightgreen",
+      "srcRelative": "elements/mosaic_lightgreen.png",
+      "r": 182,
+      "g": 188,
+      "b": 152
+    },
+    {
+      "id": "mosaic_orange",
+      "srcRelative": "elements/mosaic_orange.png",
+      "r": 215,
+      "g": 135,
+      "b": 99
+    },
+    {
+      "id": "mosaic_pink",
+      "srcRelative": "elements/mosaic_pink.png",
+      "r": 200,
+      "g": 141,
+      "b": 158
+    },
+    {
+      "id": "mosaic_red",
+      "srcRelative": "elements/mosaic_red.png",
+      "r": 153,
+      "g": 87,
+      "b": 82
+    },
+    {
+      "id": "mosaic_seagreen",
+      "srcRelative": "elements/mosaic_seagreen.png",
+      "r": 74,
+      "g": 132,
+      "b": 144
+    },
+    {
+      "id": "mosaic_yellow",
+      "srcRelative": "elements/mosaic_yellow.png",
+      "r": 198,
+      "g": 154,
+      "b": 84
+    },
+    {
+      "id": "pebble_beige",
+      "srcRelative": "elements/pebble_beige.png",
+      "r": 194,
+      "g": 163,
+      "b": 130
+    },
+    {
+      "id": "pebble_darkblue",
+      "srcRelative": "elements/pebble_darkblue.png",
+      "r": 21,
+      "g": 47,
+      "b": 114
+    },
+    {
+      "id": "pebble_green",
+      "srcRelative": "elements/pebble_green.png",
+      "r": 87,
+      "g": 133,
+      "b": 73
+    },
+    {
+      "id": "pebble_lightblue",
+      "srcRelative": "elements/pebble_lightblue.png",
+      "r": 153,
+      "g": 196,
+      "b": 223
+    },
+    {
+      "id": "pebble_lightgreen",
+      "srcRelative": "elements/pebble_lightgreen.png",
+      "r": 147,
+      "g": 152,
+      "b": 101
+    },
+    {
+      "id": "pebble_orange",
+      "srcRelative": "elements/pebble_orange.png",
+      "r": 227,
+      "g": 117,
+      "b": 34
+    },
+    {
+      "id": "pebble_pink",
+      "srcRelative": "elements/pebble_pink.png",
+      "r": 192,
+      "g": 96,
+      "b": 128
+    },
+    {
+      "id": "pebble_red",
+      "srcRelative": "elements/pebble_red.png",
+      "r": 140,
+      "g": 31,
+      "b": 34
+    },
+    {
+      "id": "pebble_seagreen",
+      "srcRelative": "elements/pebble_seagreen.png",
+      "r": 26,
+      "g": 110,
+      "b": 138
+    },
+    {
+      "id": "pebble_yellow",
+      "srcRelative": "elements/pebble_yellow.png",
+      "r": 221,
+      "g": 161,
+      "b": 49
+    },
+    {
+      "id": "pebbles_brown",
+      "srcRelative": "elements/pebbles_brown.png",
+      "r": 114,
+      "g": 69,
+      "b": 41
+    },
+    {
+      "id": "plain_beige",
+      "srcRelative": "elements/plain_beige.png",
+      "r": 217,
+      "g": 200,
+      "b": 178
+    },
+    {
+      "id": "plain_brown",
+      "srcRelative": "elements/plain_brown.png",
+      "r": 98,
+      "g": 65,
+      "b": 42
+    },
+    {
+      "id": "plain_darkblue",
+      "srcRelative": "elements/plain_darkblue.png",
+      "r": 5,
+      "g": 37,
+      "b": 105
+    },
+    {
+      "id": "plain_green",
+      "srcRelative": "elements/plain_green.png",
+      "r": 123,
+      "g": 143,
+      "b": 88
+    },
+    {
+      "id": "plain_lightblue",
+      "srcRelative": "elements/plain_lightblue.png",
+      "r": 173,
+      "g": 209,
+      "b": 236
+    },
+    {
+      "id": "plain_lightgreen",
+      "srcRelative": "elements/plain_lightgreen.png",
+      "r": 180,
+      "g": 179,
+      "b": 147
+    },
+    {
+      "id": "plain_orange",
+      "srcRelative": "elements/plain_orange.png",
+      "r": 217,
+      "g": 105,
+      "b": 47
+    },
+    {
+      "id": "plain_pink",
+      "srcRelative": "elements/plain_pink.png",
+      "r": 183,
+      "g": 107,
+      "b": 128
+    },
+    {
+      "id": "plain_red",
+      "srcRelative": "elements/plain_red.png",
+      "r": 129,
+      "g": 30,
+      "b": 35
+    },
+    {
+      "id": "plain_seagreen",
+      "srcRelative": "elements/plain_seagreen.png",
+      "r": 25,
+      "g": 111,
+      "b": 134
+    },
+    {
+      "id": "plain_yellow",
+      "srcRelative": "elements/plain_yellow.png",
+      "r": 237,
+      "g": 183,
+      "b": 49
+    },
+    {
+      "id": "round_beige",
+      "srcRelative": "elements/round_beige.png",
+      "r": 206,
+      "g": 189,
+      "b": 165
+    },
+    {
+      "id": "round_brown",
+      "srcRelative": "elements/round_brown.png",
+      "r": 123,
+      "g": 82,
+      "b": 53
+    },
+    {
+      "id": "round_darkblue",
+      "srcRelative": "elements/round_darkblue.png",
+      "r": 41,
+      "g": 66,
+      "b": 119
+    },
+    {
+      "id": "round_green",
+      "srcRelative": "elements/round_green.png",
+      "r": 81,
+      "g": 122,
+      "b": 75
+    },
+    {
+      "id": "round_lightblue",
+      "srcRelative": "elements/round_lightblue.png",
+      "r": 184,
+      "g": 206,
+      "b": 212
+    },
+    {
+      "id": "round_lightgreen",
+      "srcRelative": "elements/round_lightgreen.png",
+      "r": 163,
+      "g": 176,
+      "b": 123
+    },
+    {
+      "id": "round_orange",
+      "srcRelative": "elements/round_orange.png",
+      "r": 213,
+      "g": 121,
+      "b": 69
+    },
+    {
+      "id": "round_pink",
+      "srcRelative": "elements/round_pink.png",
+      "r": 200,
+      "g": 142,
+      "b": 153
+    },
+    {
+      "id": "round_red",
+      "srcRelative": "elements/round_red.png",
+      "r": 154,
+      "g": 57,
+      "b": 55
+    },
+    {
+      "id": "round_seagreen",
+      "srcRelative": "elements/round_seagreen.png",
+      "r": 48,
+      "g": 114,
+      "b": 129
+    },
+    {
+      "id": "round_yellow",
+      "srcRelative": "elements/round_yellow.png",
+      "r": 216,
+      "g": 166,
+      "b": 64
+    },
+    {
+      "id": "spinner_beige",
+      "srcRelative": "elements/spinner_beige.png",
+      "r": 221,
+      "g": 206,
+      "b": 189
+    },
+    {
+      "id": "spinner_brown",
+      "srcRelative": "elements/spinner_brown.png",
+      "r": 118,
+      "g": 71,
+      "b": 43
+    },
+    {
+      "id": "spinner_darkblue",
+      "srcRelative": "elements/spinner_darkblue.png",
+      "r": 13,
+      "g": 41,
+      "b": 114
+    },
+    {
+      "id": "spinner_green",
+      "srcRelative": "elements/spinner_green.png",
+      "r": 117,
+      "g": 140,
+      "b": 86
+    },
+    {
+      "id": "spinner_lightblue",
+      "srcRelative": "elements/spinner_lightblue.png",
+      "r": 159,
+      "g": 184,
+      "b": 193
+    },
+    {
+      "id": "spinner_lightgreen",
+      "srcRelative": "elements/spinner_lightgreen.png",
+      "r": 173,
+      "g": 176,
+      "b": 137
+    },
+    {
+      "id": "spinner_orange",
+      "srcRelative": "elements/spinner_orange.png",
+      "r": 217,
+      "g": 109,
+      "b": 54
+    },
+    {
+      "id": "spinner_pink",
+      "srcRelative": "elements/spinner_pink.png",
+      "r": 197,
+      "g": 136,
+      "b": 145
+    },
+    {
+      "id": "spinner_red",
+      "srcRelative": "elements/spinner_red.png",
+      "r": 142,
+      "g": 44,
+      "b": 47
+    },
+    {
+      "id": "spinner_seagreen",
+      "srcRelative": "elements/spinner_seagreen.png",
+      "r": 56,
+      "g": 119,
+      "b": 137
+    },
+    {
+      "id": "spinner_yellow",
+      "srcRelative": "elements/spinner_yellow.png",
+      "r": 227,
+      "g": 176,
+      "b": 57
+    },
+    {
+      "id": "triangle_beige",
+      "srcRelative": "elements/triangle_beige.png",
+      "r": 195,
+      "g": 177,
+      "b": 152
+    },
+    {
+      "id": "triangle_brown",
+      "srcRelative": "elements/triangle_brown.png",
+      "r": 111,
+      "g": 75,
+      "b": 48
+    },
+    {
+      "id": "triangle_darkblue",
+      "srcRelative": "elements/triangle_darkblue.png",
+      "r": 24,
+      "g": 48,
+      "b": 101
+    },
+    {
+      "id": "triangle_green",
+      "srcRelative": "elements/triangle_green.png",
+      "r": 68,
+      "g": 111,
+      "b": 79
+    },
+    {
+      "id": "triangle_lightblue",
+      "srcRelative": "elements/triangle_lightblue.png",
+      "r": 156,
+      "g": 180,
+      "b": 189
+    },
+    {
+      "id": "triangle_lightgreen",
+      "srcRelative": "elements/triangle_lightgreen.png",
+      "r": 159,
+      "g": 164,
+      "b": 123
+    },
+    {
+      "id": "triangle_orange",
+      "srcRelative": "elements/triangle_orange.png",
+      "r": 211,
+      "g": 113,
+      "b": 43
+    },
+    {
+      "id": "triangle_pink",
+      "srcRelative": "elements/triangle_pink.png",
+      "r": 188,
+      "g": 127,
+      "b": 137
+    },
+    {
+      "id": "triangle_red",
+      "srcRelative": "elements/triangle_red.png",
+      "r": 130,
+      "g": 35,
+      "b": 37
+    },
+    {
+      "id": "triangle_seagreen",
+      "srcRelative": "elements/triangle_seagreen.png",
+      "r": 39,
+      "g": 111,
+      "b": 132
+    },
+    {
+      "id": "triangle_yellow",
+      "srcRelative": "elements/triangle_yellow.png",
+      "r": 186,
+      "g": 123,
+      "b": 45
+    }
+  ]
+}
