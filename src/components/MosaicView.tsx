@@ -1,9 +1,12 @@
 import gsap from 'gsap';
-import { memo, forwardRef, useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { memo, forwardRef, useEffect, useMemo, useRef, type CSSProperties, type RefObject } from 'react';
 import { getLivingMotionParams } from '../animations/tileLiving';
 import { revealGsParamsFromSeed, revealMicroFromSeed } from '../animations/tileReveal';
 import type { MosaicCell } from '../lib/mosaic';
 import { GRID_H, GRID_W } from '../lib/waveOrder';
+import { HandRippleTileShell, tileFlatIndex, useHandRippleRegister } from '../handTracking/HandRippleContext';
+import { HandCursorOverlay } from '../handTracking/HandCursorOverlay';
+import type { HandCanvasNorm } from '../handTracking/useHandTrackingRuntime';
 
 export type MosaicViewProps = {
   generationId: number;
@@ -11,12 +14,18 @@ export type MosaicViewProps = {
   canvasBg: string;
   living: boolean;
   emptyLabel: string;
+  /** Wrap tiles with hand ripple shell (expects HandRippleProvider above) */
+  handTileRipple?: boolean;
+  handCursorActive?: boolean;
+  handCanvasNormRef?: RefObject<HandCanvasNorm | null>;
+  handPresentRef?: RefObject<boolean>;
 };
 
 type TileProps = {
   cell: MosaicCell;
   living: boolean;
   genT0: number;
+  rippleShell: boolean;
 };
 
 const LIVING_LAYER: CSSProperties = {
@@ -27,12 +36,13 @@ const LIVING_LAYER: CSSProperties = {
   borderRadius: 2,
 };
 
-const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
+const BloomTile = memo(function BloomTile({ cell, living, genT0, rippleShell }: TileProps) {
   const { cx, cy, url, delaySec, seed } = cell;
   const livingOn = living;
   const { rotateDeg, yPercent } = revealMicroFromSeed(seed);
   const livingParams = useMemo(() => getLivingMotionParams(seed), [seed]);
   const popsAboveGrid = livingOn && livingParams.kind !== 'static';
+  const handRipple = useHandRippleRegister();
 
   const revealRef = useRef<HTMLDivElement>(null);
   const livingScaleRef = useRef<HTMLDivElement>(null);
@@ -147,11 +157,50 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
       },
     );
 
+    const dampenBuf = handRipple?.livingDampen;
+    const dIdx = tileFlatIndex(cx, cy);
+    let tickBlend: (() => void) | undefined;
+    if (dampenBuf) {
+      tickBlend = () => {
+        const inf = dampenBuf[dIdx] ?? 0;
+        tw.timeScale(0.06 + 0.94 * (1 - Math.min(1, inf)));
+      };
+      gsap.ticker.add(tickBlend);
+    }
+
     return () => {
+      if (tickBlend) gsap.ticker.remove(tickBlend);
       tw.kill();
       reset();
     };
-  }, [livingOn, seed, livingParams]);
+  }, [livingOn, seed, livingParams, cx, cy, handRipple?.livingDampen]);
+
+  const inner = (
+    <div
+      ref={revealRef}
+      style={{
+        width: '100%',
+        height: '100%',
+        transformOrigin: '50% 50%',
+        opacity: 0,
+      }}
+    >
+      <div ref={livingScaleRef} style={LIVING_LAYER}>
+        <img
+          src={url}
+          alt=""
+          draggable={false}
+          decoding="async"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'fill',
+            display: 'block',
+          }}
+        />
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -165,36 +214,23 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
         zIndex: popsAboveGrid ? 4 + (seed & 31) : undefined,
       }}
     >
-      <div
-        ref={revealRef}
-        style={{
-          width: '100%',
-          height: '100%',
-          transformOrigin: '50% 50%',
-          opacity: 0,
-        }}
-      >
-        <div ref={livingScaleRef} style={LIVING_LAYER}>
-          <img
-            src={url}
-            alt=""
-            draggable={false}
-            decoding="async"
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'fill',
-              display: 'block',
-            }}
-          />
-        </div>
-      </div>
+      {rippleShell ? <HandRippleTileShell cx={cx} cy={cy}>{inner}</HandRippleTileShell> : inner}
     </div>
   );
 });
 
 export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function MosaicView(
-  { generationId, cells, canvasBg, living, emptyLabel },
+  {
+    generationId,
+    cells,
+    canvasBg,
+    living,
+    emptyLabel,
+    handTileRipple = false,
+    handCursorActive = false,
+    handCanvasNormRef,
+    handPresentRef,
+  },
   ref,
 ) {
   const hasTiles = cells.length > 0;
@@ -231,8 +267,16 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
               cell={cell}
               living={living}
               genT0={genT0}
+              rippleShell={handTileRipple}
             />
           ))}
+          {handCursorActive && handCanvasNormRef && handPresentRef ? (
+            <HandCursorOverlay
+              handCanvasNormRef={handCanvasNormRef}
+              handPresentRef={handPresentRef}
+              active={handCursorActive}
+            />
+          ) : null}
         </div>
       ) : (
         <div

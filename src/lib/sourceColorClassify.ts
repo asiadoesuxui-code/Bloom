@@ -52,7 +52,7 @@ export function isVegetationGreenSample(r: number, g: number, b: number, lab: Ok
  * Field + forest mass tone: dark tree silhouettes, crushed shadow greens, misty mid-tones.
  * These are where brown ceramics incorrectly “win” via ΔE even though there is little true brown in the photo.
  */
-function isForestOrFieldMassTone(r: number, g: number, b: number, lab: Oklab): boolean {
+function isForestOrFieldMassTone(r: number, g: number, b: number, _lab: Oklab): boolean {
   if (b > g + 16 && b > r + 12) return false;
   if (r > g + 26 && r > b + 12) return false;
 

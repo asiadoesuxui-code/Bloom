@@ -13,7 +13,7 @@ export function parseTileKeysFromId(id: string): TileKeys {
   return { shapeKey: stem.slice(0, i), colorKey: stem.slice(i + 1) };
 }
 
-export function getTileKeys(entry: Pick<ElementColorEntry, 'id' | 'shapeKey' | 'colorKey'>): TileKeys {
+export function getTileKeys(entry: Pick<ElementColorEntry, 'id'> & Partial<TileKeys>): TileKeys {
   if (entry.colorKey != null && entry.shapeKey != null) {
     return { shapeKey: entry.shapeKey, colorKey: entry.colorKey };
   }
