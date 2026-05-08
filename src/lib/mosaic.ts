@@ -14,6 +14,8 @@ import { GRID_H, GRID_W, waveRankMap } from './waveOrder';
 
 export const REVEAL_TOTAL_MS = 5000;
 export const REVEAL_TILE_DURATION_SEC = 0.2;
+/** Max per-cell time shift vs pure diagonal rank, as a fraction of stagger span (keeps TL→BR while adding irregularity). */
+export const REVEAL_CHAOS_FRAC = 0.14;
 
 export type MosaicCell = {
   cx: number;
@@ -296,6 +298,7 @@ export async function buildMosaicFromImageUrl(
   const totalCells = GRID_W * GRID_H;
   const maxRank = Math.max(1, totalCells - 1);
   const staggerSpanSec = REVEAL_TOTAL_MS / 1000 - REVEAL_TILE_DURATION_SEC;
+  const chaosMaxSec = staggerSpanSec * REVEAL_CHAOS_FRAC;
 
   const cells: MosaicCell[] = [];
   let processed = 0;
@@ -308,7 +311,11 @@ export async function buildMosaicFromImageUrl(
         throw new Error('No tiles available for mosaic');
       }
       const rank = ranks.get(`${cx},${cy}`) ?? 0;
-      const delaySec = (rank / maxRank) * staggerSpanSec;
+      const baseDelaySec = (rank / maxRank) * staggerSpanSec;
+      const delaySec = Math.min(
+        staggerSpanSec,
+        Math.max(0, baseDelaySec + revealChaosOffsetSec(cx, cy, varietySeed, chaosMaxSec)),
+      );
       const seed = hashSeed(cx, cy, choice.id);
       cells.push({
         cx,
@@ -341,4 +348,23 @@ function hashSeed(cx: number, cy: number, tileId: string): number {
     h = Math.imul(h ^ tileId.charCodeAt(i), 2654435761);
   }
   return Math.abs(h | 0);
+}
+
+function unitHash01(seed: number, cx: number, cy: number, salt: number): number {
+  let h = seed ^ Math.imul(cx, 0x1e35a7bd) ^ Math.imul(cy, 0x26c93077) ^ salt;
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x7feb352d);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x846ca68b);
+  h ^= h >>> 16;
+  return (h >>> 0) / 0x1_0000_0000;
+}
+
+/** Blended two-noise offset in ~[-maxOffsetSec, maxOffsetSec] for less grid-like jitter. */
+function revealChaosOffsetSec(cx: number, cy: number, varietySeed: number, maxOffsetSec: number): number {
+  if (maxOffsetSec <= 0) return 0;
+  const u = unitHash01(varietySeed, cx, cy, 0x27d4eb2d);
+  const v = unitHash01(varietySeed, cx, cy, 0xf4a98d1d);
+  const blended = u + v - 1;
+  return blended * maxOffsetSec;
 }

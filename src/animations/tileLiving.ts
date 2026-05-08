@@ -16,7 +16,7 @@ export function getLivingMotion(seed: number): LivingMotionPreset {
   return {
     type: 'pulseScale',
     animate: {
-      scale: [1, 1.018, 1],
+      scale: [1, 1.015, 1],
     },
     transition: {
       duration,

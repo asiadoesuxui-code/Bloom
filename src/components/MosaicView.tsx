@@ -1,5 +1,5 @@
 import { memo, forwardRef } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { getLivingMotion } from '../animations/tileLiving';
 import type { MosaicCell } from '../lib/mosaic';
 import { GRID_H, GRID_W } from '../lib/waveOrder';
@@ -21,9 +21,10 @@ type TileProps = {
 const BloomTile = memo(function BloomTile({ cell, living }: TileProps) {
   const { cx, cy, url, delaySec, seed } = cell;
   const livingPreset = getLivingMotion(seed);
+  const livingOn = living && livingPreset.type === 'pulseScale';
 
   return (
-    <motion.div
+    <div
       style={{
         position: 'absolute',
         left: `${(cx * 100) / GRID_W}%`,
@@ -32,34 +33,48 @@ const BloomTile = memo(function BloomTile({ cell, living }: TileProps) {
         height: `${100 / GRID_H}%`,
         overflow: 'hidden',
       }}
-      initial={{ opacity: 0, scale: 0.92 }}
-      animate={
-        living && livingPreset.type === 'pulseScale'
-          ? { opacity: 1, scale: livingPreset.animate.scale }
-          : { opacity: 1, scale: 1 }
-      }
-      transition={
-        living && livingPreset.type === 'pulseScale'
-          ? livingPreset.transition
-          : {
-              duration: REVEAL_TILE_DURATION_SEC,
-              ease: 'easeOut',
-              delay: delaySec,
-            }
-      }
     >
-      <img
-        src={url}
-        alt=""
-        draggable={false}
+      <motion.div
         style={{
           width: '100%',
           height: '100%',
-          objectFit: 'fill',
-          display: 'block',
+          transformOrigin: '50% 50%',
         }}
-      />
-    </motion.div>
+        initial={{ opacity: 0, scale: 0.92 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{
+          duration: REVEAL_TILE_DURATION_SEC,
+          ease: 'easeOut',
+          delay: delaySec,
+        }}
+      >
+        <motion.div
+          style={{
+            width: '100%',
+            height: '100%',
+            transformOrigin: '50% 50%',
+          }}
+          animate={livingOn ? { scale: livingPreset.animate.scale } : { scale: 1 }}
+          transition={
+            livingOn
+              ? livingPreset.transition
+              : { duration: 0 }
+          }
+        >
+          <img
+            src={url}
+            alt=""
+            draggable={false}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'fill',
+              display: 'block',
+            }}
+          />
+        </motion.div>
+      </motion.div>
+    </div>
   );
 });
 
@@ -83,20 +98,18 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
       }}
     >
       {hasTiles ? (
-        <AnimatePresence initial={false}>
-          <motion.div
-            key={generationId}
-            style={{
-              position: 'relative',
-              width: '100%',
-              height: '100%',
-            }}
-          >
-            {cells.map((cell) => (
-              <BloomTile key={`${generationId}-${cell.cx}-${cell.cy}`} cell={cell} living={living} />
-            ))}
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          key={generationId}
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+          }}
+        >
+          {cells.map((cell) => (
+            <BloomTile key={`${generationId}-${cell.cx}-${cell.cy}`} cell={cell} living={living} />
+          ))}
+        </motion.div>
       ) : (
         <div
           style={{
