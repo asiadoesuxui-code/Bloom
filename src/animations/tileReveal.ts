@@ -1,6 +1,4 @@
-import type { Transition } from 'framer-motion';
-
-/** Per-tile spring for the diagonal reveal (seed keeps variation stable per cell). */
+/** Per-tile spring-ish physics hints from seed (maps to GSAP duration / ease). */
 export function revealSpringFromSeed(seed: number): {
   stiffness: number;
   damping: number;
@@ -28,15 +26,34 @@ export function revealMicroFromSeed(seed: number): RevealMicro {
   return { rotateDeg, yPercent };
 }
 
-export function revealTransitionFromSeed(seed: number, delaySec: number): Transition {
-  const { stiffness, damping, mass } = revealSpringFromSeed(seed);
-  const d = delaySec;
-  /** Per-key `delay` so opacity tween is not left at t=0 while springs wait (Framer does not always inherit root delay onto nested tweens). */
-  const spring = { type: 'spring' as const, stiffness, damping, mass, delay: d };
+export type RevealGsParams = {
+  delaySec: number;
+  opacityDur: number;
+  transformDur: number;
+  /** GSAP ease string */
+  transformEase: string;
+};
+
+/**
+ * Snappy reveal aligned with the prior ~200ms spring feel: fast ease-out body,
+ * optional mild back overshoot from seed. Elastic removed — it reads as slow / dragged early on.
+ */
+export function revealGsParamsFromSeed(seed: number, delaySec: number): RevealGsParams {
+  const { stiffness, mass } = revealSpringFromSeed(seed);
+  const transformDur =
+    0.2 + mass * 0.05 + ((520 - Math.min(520, stiffness)) / 520) * 0.08;
+  const clampedDur = Math.min(0.36, Math.max(0.22, transformDur));
+
+  /** Mostly power3.out (quick onset); ~¼ tiles get light back for variety without long tails */
+  const useBack = (seed >>> 4) & 3;
+  const backAmt = 1.06 + ((stiffness - 300) / 250) * 0.14;
+  const backClamped = Math.min(1.22, Math.max(1.05, backAmt));
+  const transformEase = useBack === 0 ? `back.out(${backClamped})` : 'power3.out';
+
   return {
-    opacity: { type: 'tween', ease: 'easeOut', duration: 0.22, delay: d },
-    scale: spring,
-    rotate: spring,
-    y: spring,
+    delaySec,
+    opacityDur: 0.17,
+    transformDur: clampedDur,
+    transformEase,
   };
 }

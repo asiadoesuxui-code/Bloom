@@ -3,6 +3,7 @@ import { toPng } from 'html-to-image';
 import { Chrome } from './components/Chrome';
 import { MosaicView } from './components/MosaicView';
 import { buildMosaicFromImageUrl, REVEAL_TOTAL_MS, type MosaicCell } from './lib/mosaic';
+import { preloadMosaicTileUrls } from './lib/preloadMosaicTiles';
 import { loadResolvedTiles } from './lib/tileUrls';
 import { loadSourceAssets, createFairSourcePicker, randomIntegerBelow } from './lib/sources';
 
@@ -46,6 +47,7 @@ export default function App() {
     try {
       const varietySeed = randomIntegerBelow(0x7fff_ffff + 1);
       const built = await buildMosaicFromImageUrl(choice.url, tiles, varietySeed, choice.stem);
+      await preloadMosaicTileUrls(built);
       setCells(built);
       sourcePicker.advanceAfterSuccess();
       lastPickedStemRef.current = choice.stem;

@@ -1,7 +1,7 @@
-import { memo, forwardRef } from 'react';
-import { motion } from 'framer-motion';
-import { getLivingMotion } from '../animations/tileLiving';
-import { revealMicroFromSeed, revealTransitionFromSeed } from '../animations/tileReveal';
+import gsap from 'gsap';
+import { memo, forwardRef, useEffect, useMemo, useRef } from 'react';
+import { getLivingPulseParams } from '../animations/tileLiving';
+import { revealGsParamsFromSeed, revealMicroFromSeed } from '../animations/tileReveal';
 import type { MosaicCell } from '../lib/mosaic';
 import { GRID_H, GRID_W } from '../lib/waveOrder';
 
@@ -16,13 +16,108 @@ export type MosaicViewProps = {
 type TileProps = {
   cell: MosaicCell;
   living: boolean;
+  genT0: number;
 };
 
-const BloomTile = memo(function BloomTile({ cell, living }: TileProps) {
+const BloomTile = memo(function BloomTile({ cell, living, genT0 }: TileProps) {
   const { cx, cy, url, delaySec, seed } = cell;
-  const livingPreset = getLivingMotion(seed);
-  const livingOn = living && livingPreset.type === 'pulseScale';
+  const livingOn = living && getLivingPulseParams(seed).type === 'pulseScale';
   const { rotateDeg, yPercent } = revealMicroFromSeed(seed);
+
+  const revealRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+
+  /** Spread tween registration across frames so one commit doesn’t freeze the tab */
+  const deferFrames = Math.min(14, Math.floor((cy * GRID_W + cx) / 145));
+
+  useEffect(() => {
+    const revealEl = revealRef.current;
+    if (!revealEl) return;
+
+    let cancelled = false;
+    let raf = 0;
+    let framesLeft = deferFrames;
+    let tw1: gsap.core.Tween | undefined;
+    let tw2: gsap.core.Tween | undefined;
+
+    const arm = () => {
+      if (cancelled) return;
+      const params = revealGsParamsFromSeed(seed, delaySec);
+      const elapsedSec = (performance.now() - genT0) / 1000;
+      const delayLeft = Math.max(0, params.delaySec - elapsedSec);
+
+      gsap.set(revealEl, {
+        opacity: 0,
+        scale: 0.92,
+        rotation: rotateDeg,
+        yPercent,
+        transformOrigin: '50% 50%',
+      });
+
+      tw1 = gsap.to(revealEl, {
+        opacity: 1,
+        duration: params.opacityDur,
+        ease: 'power3.out',
+        delay: delayLeft,
+        overwrite: 'auto',
+      });
+      tw2 = gsap.to(revealEl, {
+        scale: 1,
+        rotation: 0,
+        yPercent: 0,
+        duration: params.transformDur,
+        ease: params.transformEase,
+        delay: delayLeft,
+        overwrite: 'auto',
+      });
+    };
+
+    const tick = () => {
+      if (cancelled) return;
+      if (framesLeft-- > 0) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      arm();
+    };
+
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      tw1?.kill();
+      tw2?.kill();
+      gsap.killTweensOf(revealEl);
+    };
+  }, [genT0, seed, delaySec, rotateDeg, yPercent, deferFrames]);
+
+  useEffect(() => {
+    const innerEl = innerRef.current;
+    if (!innerEl) return;
+
+    if (!livingOn) {
+      gsap.killTweensOf(innerEl);
+      gsap.set(innerEl, { scale: 1 });
+      return;
+    }
+
+    const pulse = getLivingPulseParams(seed);
+    const legDur = pulse.cycleDurationSec / 2;
+    const tween = gsap.to(innerEl, {
+      scale: pulse.scalePeak,
+      duration: legDur,
+      ease: 'sine.inOut',
+      repeat: -1,
+      yoyo: true,
+      delay: pulse.phaseDelaySec,
+    });
+
+    return () => {
+      tween.kill();
+      gsap.set(innerEl, { scale: 1 });
+    };
+  }, [livingOn, seed]);
 
   return (
     <div
@@ -35,38 +130,29 @@ const BloomTile = memo(function BloomTile({ cell, living }: TileProps) {
         overflow: 'hidden',
       }}
     >
-      <motion.div
+      <div
+        ref={revealRef}
         style={{
           width: '100%',
           height: '100%',
           transformOrigin: '50% 50%',
-        }}
-        initial={{
           opacity: 0,
-          scale: 0.92,
-          rotate: rotateDeg,
-          y: `${yPercent}%`,
+          willChange: 'transform, opacity',
         }}
-        animate={{ opacity: 1, scale: 1, rotate: 0, y: '0%' }}
-        transition={revealTransitionFromSeed(seed, delaySec)}
       >
-        <motion.div
+        <div
+          ref={innerRef}
           style={{
             width: '100%',
             height: '100%',
             transformOrigin: '50% 50%',
           }}
-          animate={livingOn ? { scale: livingPreset.animate.scale } : { scale: 1 }}
-          transition={
-            livingOn
-              ? livingPreset.transition
-              : { duration: 0 }
-          }
         >
           <img
             src={url}
             alt=""
             draggable={false}
+            decoding="async"
             style={{
               width: '100%',
               height: '100%',
@@ -74,8 +160,8 @@ const BloomTile = memo(function BloomTile({ cell, living }: TileProps) {
               display: 'block',
             }}
           />
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
     </div>
   );
 });
@@ -85,6 +171,7 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
   ref,
 ) {
   const hasTiles = cells.length > 0;
+  const genT0 = useMemo(() => performance.now(), [generationId]);
 
   return (
     <div
@@ -100,7 +187,7 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
       }}
     >
       {hasTiles ? (
-        <motion.div
+        <div
           key={generationId}
           style={{
             position: 'relative',
@@ -109,9 +196,14 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
           }}
         >
           {cells.map((cell) => (
-            <BloomTile key={`${generationId}-${cell.cx}-${cell.cy}`} cell={cell} living={living} />
+            <BloomTile
+              key={`${generationId}-${cell.cx}-${cell.cy}`}
+              cell={cell}
+              living={living}
+              genT0={genT0}
+            />
           ))}
-        </motion.div>
+        </div>
       ) : (
         <div
           style={{
