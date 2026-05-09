@@ -3,20 +3,19 @@ import type { HandTrackingErrorKind } from './useHandTrackingRuntime';
 
 type Props = {
   error: HandTrackingErrorKind | null;
-  waitingForMosaic?: boolean;
 };
 
-export function HandPocDevHud({ error, waitingForMosaic }: Props) {
+export function HandPocDevHud({ error }: Props) {
   const hud = useMemo(() => {
-    if (waitingForMosaic)
-      return 'Generate a mosaic to start the camera and see the tracked dot over the artwork.';
     if (error === 'denied')
       return 'Camera access was denied. Allow the camera to see tracking over the mosaic.';
     if (error === 'no_device') return 'No camera found.';
     if (error === 'init_failed') return 'Could not start hand tracking.';
     if (error === 'not_found') return 'Camera could not be opened.';
     return null;
-  }, [error, waitingForMosaic]);
+  }, [error]);
+
+  if (!hud) return null;
 
   return (
     <div
@@ -44,23 +43,21 @@ export function HandPocDevHud({ error, waitingForMosaic }: Props) {
       >
         Dev — hand POC
       </div>
-      {hud && (
-        <div
-          style={{
-            maxWidth: 420,
-            textAlign: 'center',
-            padding: '8px 12px',
-            borderRadius: 8,
-            fontSize: 12,
-            lineHeight: 1.45,
-            color: 'rgba(255,210,190,0.95)',
-            background: 'rgba(28,14,12,0.78)',
-            border: '1px solid rgba(255,140,100,0.22)',
-          }}
-        >
-          {hud}
-        </div>
-      )}
+      <div
+        style={{
+          maxWidth: 420,
+          textAlign: 'center',
+          padding: '8px 12px',
+          borderRadius: 8,
+          fontSize: 12,
+          lineHeight: 1.45,
+          color: 'rgba(255,210,190,0.95)',
+          background: 'rgba(28,14,12,0.78)',
+          border: '1px solid rgba(255,140,100,0.22)',
+        }}
+      >
+        {hud}
+      </div>
     </div>
   );
 }

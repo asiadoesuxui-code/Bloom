@@ -1,12 +1,10 @@
 import gsap from 'gsap';
-import { memo, forwardRef, useEffect, useMemo, useRef, type CSSProperties, type RefObject } from 'react';
+import { memo, forwardRef, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import { getLivingMotionParams } from '../animations/tileLiving';
 import { revealGsParamsFromSeed, revealMicroFromSeed } from '../animations/tileReveal';
 import type { MosaicCell } from '../lib/mosaic';
 import { GRID_H, GRID_W } from '../lib/waveOrder';
 import { HandRippleTileShell, tileFlatIndex, useHandRippleRegister } from '../handTracking/HandRippleContext';
-import { HandCursorOverlay } from '../handTracking/HandCursorOverlay';
-import type { HandCanvasNorm } from '../handTracking/useHandTrackingRuntime';
 
 export type MosaicViewProps = {
   generationId: number;
@@ -16,9 +14,6 @@ export type MosaicViewProps = {
   emptyLabel: string;
   /** Wrap tiles with hand ripple shell (expects HandRippleProvider above) */
   handTileRipple?: boolean;
-  handCursorActive?: boolean;
-  handCanvasNormRef?: RefObject<HandCanvasNorm | null>;
-  handPresentRef?: RefObject<boolean>;
 };
 
 type TileProps = {
@@ -233,9 +228,6 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
     living,
     emptyLabel,
     handTileRipple = false,
-    handCursorActive = false,
-    handCanvasNormRef,
-    handPresentRef,
   },
   ref,
 ) {
@@ -276,13 +268,6 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
               rippleShell={handTileRipple}
             />
           ))}
-          {handCursorActive && handCanvasNormRef && handPresentRef ? (
-            <HandCursorOverlay
-              handCanvasNormRef={handCanvasNormRef}
-              handPresentRef={handPresentRef}
-              active={handCursorActive}
-            />
-          ) : null}
         </div>
       ) : (
         <div

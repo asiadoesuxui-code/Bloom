@@ -1,14 +1,10 @@
 type ChromeProps = {
-  canvasBg: string;
-  swatches: readonly string[];
-  onPickBg: (hex: string) => void;
   onGenerate: () => void;
-  onSave: () => void;
   /** Disable generate while computing mosaic */
   computeBusy: boolean;
   /** Show mosaic area */
   hasCells: boolean;
-  /** After reveal timeline — Regenerate + Save */
+  /** After reveal timeline — Regenerate label */
   artworkReady: boolean;
   /** Missing configuration messages */
   missingTiles: boolean;
@@ -16,11 +12,7 @@ type ChromeProps = {
 };
 
 export function Chrome({
-  canvasBg,
-  swatches,
-  onPickBg,
   onGenerate,
-  onSave,
   computeBusy,
   hasCells,
   artworkReady,
@@ -36,9 +28,7 @@ export function Chrome({
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
           padding: '18px 28px 10px',
-          gap: 16,
         }}
       >
         <div
@@ -50,28 +40,6 @@ export function Chrome({
           }}
         >
           Bloom
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {swatches.map((hex) => {
-            const active = hex.toLowerCase() === canvasBg.toLowerCase();
-            return (
-              <button
-                key={hex}
-                type="button"
-                title={`Background ${hex}`}
-                onClick={() => onPickBg(hex)}
-                style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: '999px',
-                  border: active ? '2px solid rgba(255,255,255,0.85)' : '2px solid rgba(255,255,255,0.22)',
-                  backgroundColor: hex,
-                  padding: 0,
-                  boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.35)',
-                }}
-              />
-            );
-          })}
         </div>
       </header>
 
@@ -104,23 +72,6 @@ export function Chrome({
         >
           {computeBusy ? 'Generating…' : artworkReady && hasCells ? 'Regenerate' : 'Generate'}
         </button>
-
-        {artworkReady && hasCells ? (
-          <button
-            type="button"
-            onClick={onSave}
-            style={{
-              minWidth: 148,
-              padding: '12px 22px',
-              borderRadius: 999,
-              border: '1px solid rgba(122, 162, 247, 0.35)',
-              background: 'rgba(122, 162, 247, 0.12)',
-              color: 'rgba(226, 235, 255, 0.95)',
-            }}
-          >
-            Save image
-          </button>
-        ) : null}
 
         {warn ? (
           <span style={{ fontSize: 13, color: 'rgba(245,245,245,0.55)', width: '100%', textAlign: 'center' }}>

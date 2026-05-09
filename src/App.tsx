@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react';
-import { toPng } from 'html-to-image';
 import { Chrome } from './components/Chrome';
 import { MosaicView } from './components/MosaicView';
 import { buildMosaicFromImageUrl, REVEAL_TOTAL_MS, type MosaicCell } from './lib/mosaic';
@@ -11,8 +10,7 @@ import { HandRippleProvider } from './handTracking/HandRippleContext';
 import { HandTrackingToggle } from './handTracking/HandTrackingToggle';
 import { HandPocDevHud } from './handTracking/HandPocDevHud';
 
-const BG_SWATCHES = ['#0e0f12', '#14161c', '#1a1424'] as const;
-const DEFAULT_BG = BG_SWATCHES[0]!;
+const CANVAS_BG = '#0e0f12';
 
 type Phase = 'idle' | 'computing' | 'revealing' | 'done';
 
@@ -23,9 +21,8 @@ export default function App() {
   const sourcePicker = useMemo(() => createFairSourcePicker(sourceAssets), [sourceAssets]);
   const lastPickedStemRef = useRef<string | null>(null);
 
-  const [canvasBg, setCanvasBg] = useState<string>(DEFAULT_BG);
-  const [phase, setPhase] = useState<Phase>('idle');
   const [generationId, setGenerationId] = useState(0);
+  const [phase, setPhase] = useState<Phase>('idle');
   const [cells, setCells] = useState<MosaicCell[]>([]);
   const [living, setLiving] = useState(false);
   const [handTracking, setHandTracking] = useState(false);
@@ -77,26 +74,6 @@ export default function App() {
     }
   }, [missingTiles, missingSources, sourcePicker, tiles]);
 
-  const savePng = useCallback(async () => {
-    const node = mosaicRef.current;
-    if (!node) return;
-    try {
-      const dataUrl = await toPng(node, {
-        pixelRatio: 2,
-        backgroundColor: canvasBg,
-        cacheBust: true,
-        filter: (domNode) =>
-          domNode instanceof Element && domNode.closest('[data-bloom-hand-ui]') ? false : true,
-      });
-      const a = document.createElement('a');
-      a.href = dataUrl;
-      a.download = `bloom-${Date.now()}.png`;
-      a.click();
-    } catch (e) {
-      console.error(e);
-    }
-  }, [canvasBg]);
-
   const computeBusy = phase === 'computing';
   const artworkReady = phase === 'done';
 
@@ -116,11 +93,7 @@ export default function App() {
         }}
       >
         <Chrome
-          canvasBg={canvasBg}
-          swatches={BG_SWATCHES}
-          onPickBg={setCanvasBg}
           onGenerate={runGenerate}
-          onSave={savePng}
           computeBusy={computeBusy}
           hasCells={hasCells}
           artworkReady={artworkReady}
@@ -159,23 +132,15 @@ export default function App() {
               boxSizing: 'border-box',
             }}
           >
-            {handPocMode && (!computeBusy || hasCells) ? (
-              <HandPocDevHud
-                error={handRt.error}
-                waitingForMosaic={!hasCells && !computeBusy}
-              />
-            ) : null}
+            {handPocMode && hasCells ? <HandPocDevHud error={handRt.error} /> : null}
             <MosaicView
               ref={mosaicRef}
               generationId={generationId}
               cells={cells}
-              canvasBg={canvasBg}
+              canvasBg={CANVAS_BG}
               living={living}
-              emptyLabel={computeBusy ? 'Painting mosaic…' : 'Press Generate'}
+              emptyLabel={computeBusy ? 'Painting mosaic…' : 'Press generate to create your artwork'}
               handTileRipple={handPipelineOn}
-              handCursorActive={handPipelineOn && !handRt.error}
-              handCanvasNormRef={handRt.handCanvasNormRef}
-              handPresentRef={handRt.handPresentRef}
             />
           </div>
         </main>

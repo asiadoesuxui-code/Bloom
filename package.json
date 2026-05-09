@@ -16,7 +16,6 @@
     "@mediapipe/tasks-vision": "^0.10.21",
     "framer-motion": "^11.18.0",
     "gsap": "^3.12.7",
-    "html-to-image": "^1.11.13",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
