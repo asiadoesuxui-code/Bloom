@@ -36,3 +36,17 @@ button {
 #root {
   min-height: 100svh;
 }
+
+/* Mosaic reveal — one compositor animation per tile (opacity + transform share timing). */
+@keyframes bloomTileReveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, calc(var(--bloom-reveal-y-pct, 0) * 1%), 0)
+      rotate(calc(var(--bloom-reveal-r-deg, 0) * 1deg)) scale3d(0.92, 0.92, 1);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale3d(1, 1, 1);
+  }
+}

@@ -1,5 +1,13 @@
 import gsap from 'gsap';
-import { memo, forwardRef, useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import {
+  memo,
+  forwardRef,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type CSSProperties,
+} from 'react';
 import { getLivingMotionParams } from '../animations/tileLiving';
 import { revealGsParamsFromSeed, revealMicroFromSeed } from '../animations/tileReveal';
 import type { MosaicCell } from '../lib/mosaic';
@@ -19,7 +27,6 @@ export type MosaicViewProps = {
 type TileProps = {
   cell: MosaicCell;
   living: boolean;
-  genT0: number;
   rippleShell: boolean;
 };
 
@@ -31,81 +38,14 @@ const LIVING_LAYER: CSSProperties = {
   borderRadius: 2,
 };
 
-const BloomTile = memo(function BloomTile({ cell, living, genT0, rippleShell }: TileProps) {
+const BloomTile = memo(function BloomTile({ cell, living, rippleShell }: TileProps) {
   const { cx, cy, url, delaySec, seed } = cell;
   const livingOn = living;
-  const { rotateDeg, yPercent } = revealMicroFromSeed(seed);
   const livingParams = useMemo(() => getLivingMotionParams(seed), [seed]);
   const popsAboveGrid = livingOn && livingParams.kind !== 'static';
   const handRipple = useHandRippleRegister();
 
-  const revealRef = useRef<HTMLDivElement>(null);
   const livingScaleRef = useRef<HTMLDivElement>(null);
-
-  /** Spread tween registration across frames so one commit doesn’t freeze the tab */
-  const deferFrames = Math.min(14, Math.floor((cy * GRID_W + cx) / 145));
-
-  useEffect(() => {
-    const revealEl = revealRef.current;
-    if (!revealEl) return;
-
-    let cancelled = false;
-    let raf = 0;
-    let framesLeft = deferFrames;
-    let tw1: gsap.core.Tween | undefined;
-    let tw2: gsap.core.Tween | undefined;
-
-    const arm = () => {
-      if (cancelled) return;
-      const params = revealGsParamsFromSeed(seed, delaySec);
-      const elapsedSec = (performance.now() - genT0) / 1000;
-      const delayLeft = Math.max(0, params.delaySec - elapsedSec);
-
-      gsap.set(revealEl, {
-        opacity: 0,
-        scale: 0.92,
-        rotation: rotateDeg,
-        yPercent,
-        transformOrigin: '50% 50%',
-      });
-
-      tw1 = gsap.to(revealEl, {
-        opacity: 1,
-        duration: params.opacityDur,
-        ease: 'power3.out',
-        delay: delayLeft,
-        overwrite: 'auto',
-      });
-      tw2 = gsap.to(revealEl, {
-        scale: 1,
-        rotation: 0,
-        yPercent: 0,
-        duration: params.transformDur,
-        ease: params.transformEase,
-        delay: delayLeft,
-        overwrite: 'auto',
-      });
-    };
-
-    const tick = () => {
-      if (cancelled) return;
-      if (framesLeft-- > 0) {
-        raf = requestAnimationFrame(tick);
-        return;
-      }
-      arm();
-    };
-
-    raf = requestAnimationFrame(tick);
-
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf);
-      tw1?.kill();
-      tw2?.kill();
-      gsap.killTweensOf(revealEl);
-    };
-  }, [genT0, seed, delaySec, rotateDeg, yPercent, deferFrames]);
 
   useEffect(() => {
     const el = livingScaleRef.current;
@@ -200,12 +140,14 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0, rippleShell }: 
       }}
     >
       <div
-        ref={revealRef}
+        data-bloom-reveal
+        data-delay={delaySec}
+        data-seed={seed}
         style={{
           width: '100%',
           height: '100%',
           transformOrigin: '50% 50%',
-          opacity: 0,
+          backfaceVisibility: 'hidden',
         }}
       >
         {rippleShell ? (
@@ -220,6 +162,37 @@ const BloomTile = memo(function BloomTile({ cell, living, genT0, rippleShell }: 
   );
 });
 
+function applyRevealAnimations(root: HTMLElement): () => void {
+  const reveals = Array.from(root.querySelectorAll<HTMLElement>('[data-bloom-reveal]'));
+
+  /** One timestamp for the whole batch — avoids ~2k per-tile layout effects drifting the stagger mid-queue. */
+  const tAssign = performance.now();
+
+  for (const revealEl of reveals) {
+    const delaySec = Number(revealEl.dataset.delay);
+    const seed = Number(revealEl.dataset.seed);
+    if (!Number.isFinite(delaySec) || !Number.isFinite(seed)) continue;
+
+    const { rotateDeg, yPercent } = revealMicroFromSeed(seed);
+    const params = revealGsParamsFromSeed(seed, delaySec);
+    const elapsedSec = (performance.now() - tAssign) / 1000;
+    const delayLeft = Math.max(0, params.delaySec - elapsedSec);
+
+    revealEl.style.setProperty('--bloom-reveal-y-pct', String(yPercent));
+    revealEl.style.setProperty('--bloom-reveal-r-deg', String(rotateDeg));
+
+    revealEl.style.animation = `bloomTileReveal ${params.transformDur}s ${params.cssTimingFunction} ${delayLeft}s both`;
+  }
+
+  return () => {
+    for (const revealEl of reveals) {
+      revealEl.style.animation = '';
+      revealEl.style.removeProperty('--bloom-reveal-y-pct');
+      revealEl.style.removeProperty('--bloom-reveal-r-deg');
+    }
+  };
+}
+
 export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function MosaicView(
   {
     generationId,
@@ -232,7 +205,14 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
   ref,
 ) {
   const hasTiles = cells.length > 0;
-  const genT0 = useMemo(() => performance.now(), [generationId]);
+  const mosaicGridRef = useRef<HTMLDivElement>(null);
+
+  /** Bulk-assign after all tiles commit. One `performance.now()` for the batch — avoids ~2k `useLayoutEffect`s stretching the stagger while the queue runs. Depends on `cells` with `generationId` so `living`/`ripple` toggles alone do not reschedule reveal. */
+  useLayoutEffect(() => {
+    const root = mosaicGridRef.current;
+    if (!root || cells.length === 0) return;
+    return applyRevealAnimations(root);
+  }, [generationId, cells]);
 
   return (
     <div
@@ -249,11 +229,13 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
     >
       {hasTiles ? (
         <div
+          ref={mosaicGridRef}
           key={generationId}
           style={{
             position: 'relative',
             width: '100%',
             height: '100%',
+            /** 3D stacking only when living kicks in (~GSAP z). */
             ...(living
               ? { perspective: 900, transformStyle: 'preserve-3d' as const }
               : {}),
@@ -264,7 +246,6 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
               key={`${generationId}-${cell.cx}-${cell.cy}`}
               cell={cell}
               living={living}
-              genT0={genT0}
               rippleShell={handTileRipple}
             />
           ))}

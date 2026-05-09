@@ -1,3 +1,6 @@
+/** Upper clamp for `transformDur` — keep in sync with `revealLivingHoldMs` in `lib/mosaic.ts`. */
+export const REVEAL_TRANSFORM_DUR_MAX_SEC = 0.36;
+
 /** Per-tile spring-ish physics hints from seed (maps to GSAP duration / ease). */
 export function revealSpringFromSeed(seed: number): {
   stiffness: number;
@@ -28,32 +31,32 @@ export function revealMicroFromSeed(seed: number): RevealMicro {
 
 export type RevealGsParams = {
   delaySec: number;
-  opacityDur: number;
   transformDur: number;
-  /** GSAP ease string */
+  /** GSAP ease hint (parity; CSS uses monotone cubic-bezier below). */
   transformEase: string;
+  /** Compositor timing for CSS transform keyframes — monotonic to avoid clip pops with overflow:hidden. */
+  cssTimingFunction: string;
 };
+
+/** GSAP-ish power3.out for CSS — stays within [0,1] on Y so transforms never extrapolate past the final keyframe. */
+const CSS_TRANSFORM_EASE_MONOTONE = 'cubic-bezier(0.33, 1, 0.68, 1)';
 
 /**
  * Snappy reveal aligned with the prior ~200ms spring feel: fast ease-out body,
- * optional mild back overshoot from seed. Elastic removed — it reads as slow / dragged early on.
+ * per-tile duration jitter from seed. Omit ease-out-back on CSS transforms: that easing pushes
+ * interpolation past the `to` keyframe (scale > 1, rotation past 0°); tiles stay
+ * `overflow:hidden` during reveal → overshoot clips against cell edges and reads as a hard jump.
  */
 export function revealGsParamsFromSeed(seed: number, delaySec: number): RevealGsParams {
   const { stiffness, mass } = revealSpringFromSeed(seed);
   const transformDur =
     0.2 + mass * 0.05 + ((520 - Math.min(520, stiffness)) / 520) * 0.08;
-  const clampedDur = Math.min(0.36, Math.max(0.22, transformDur));
-
-  /** Mostly power3.out (quick onset); ~¼ tiles get light back for variety without long tails */
-  const useBack = (seed >>> 4) & 3;
-  const backAmt = 1.06 + ((stiffness - 300) / 250) * 0.14;
-  const backClamped = Math.min(1.22, Math.max(1.05, backAmt));
-  const transformEase = useBack === 0 ? `back.out(${backClamped})` : 'power3.out';
+  const clampedDur = Math.min(REVEAL_TRANSFORM_DUR_MAX_SEC, Math.max(0.22, transformDur));
 
   return {
     delaySec,
-    opacityDur: 0.17,
     transformDur: clampedDur,
-    transformEase,
+    transformEase: 'power3.out',
+    cssTimingFunction: CSS_TRANSFORM_EASE_MONOTONE,
   };
 }

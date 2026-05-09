@@ -1,3 +1,4 @@
+import { REVEAL_TRANSFORM_DUR_MAX_SEC } from '../animations/tileReveal';
 import type { ResolvedTile } from './tileUrls';
 import { rgbToOklab, oklabDistanceSquared, type Oklab } from './colorSpace';
 import { parseTileKeysFromId } from './tileKeys';
@@ -13,6 +14,17 @@ import {
 import { GRID_H, GRID_W, waveRankMap } from './waveOrder';
 
 export const REVEAL_TOTAL_MS = 5000;
+
+/**
+ * Wait this long after reveal starts before enabling living GSAP / layout toggles.
+ * Last tile starts at `staggerSpanSec = REVEAL_TOTAL_MS/1000 - REVEAL_TILE_DURATION_SEC` and
+ * needs up to `REVEAL_TRANSFORM_DUR_MAX_SEC` for its CSS transform to finish.
+ */
+export function revealLivingHoldMs(): number {
+  const staggerSpanSec = REVEAL_TOTAL_MS / 1000 - REVEAL_TILE_DURATION_SEC;
+  const lastRevealEndSec = staggerSpanSec + REVEAL_TRANSFORM_DUR_MAX_SEC;
+  return Math.ceil(lastRevealEndSec * 1000) + 48;
+}
 export const REVEAL_TILE_DURATION_SEC = 0.2;
 /** Max per-cell time shift vs pure diagonal rank, as a fraction of stagger span (keeps TL→BR while adding irregularity). */
 export const REVEAL_CHAOS_FRAC = 0.14;

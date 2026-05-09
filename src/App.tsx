@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { Chrome } from './components/Chrome';
 import { MosaicView } from './components/MosaicView';
-import { buildMosaicFromImageUrl, REVEAL_TOTAL_MS, type MosaicCell } from './lib/mosaic';
+import { buildMosaicFromImageUrl, revealLivingHoldMs, type MosaicCell } from './lib/mosaic';
 import { preloadMosaicTileUrls } from './lib/preloadMosaicTiles';
 import { loadResolvedTiles } from './lib/tileUrls';
 import { loadSourceAssets, createFairSourcePicker, randomIntegerBelow } from './lib/sources';
@@ -44,7 +44,7 @@ export default function App() {
     const id = window.setTimeout(() => {
       setPhase('done');
       setLiving(true);
-    }, REVEAL_TOTAL_MS);
+    }, revealLivingHoldMs());
     return () => window.clearTimeout(id);
   }, [phase, generationId]);
 
