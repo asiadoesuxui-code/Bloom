@@ -8,9 +8,9 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { animate, motionValue, type MotionValue, motion } from 'framer-motion';
+import { motionValue, type MotionValue, motion } from 'framer-motion';
 import { GRID_H, GRID_W } from '../lib/waveOrder';
-import { rippleDisplacementPx } from './handRippleMath';
+import { rippleDisplacementPx, rippleInfluenceReachPx } from './handRippleMath';
 import type { HandCanvasNorm } from './useHandTrackingRuntime';
 
 export function tileFlatIndex(cx: number, cy: number): number {
@@ -20,11 +20,24 @@ export function tileFlatIndex(cx: number, cy: number): number {
 type MotionRegs = {
   tx: MotionValue<number>;
   ty: MotionValue<number>;
+  s: MotionValue<number>;
 };
 
 type Entry = MotionRegs & { cx: number; cy: number };
 
-const DISPLACE_SPRING = { type: 'spring' as const, stiffness: 380, damping: 34, mass: 0.32 };
+const FOLLOW_HAND = 0.97;
+const SETTLE_NO_HAND = 0.31;
+
+function clampScalar(v: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+
+
+/** Only tiles at or beyond this damping influence keep the carry-over footprint. */
+const CARRY_EPS = 0.00085;
+const CARRY_MOTION_EPS = 0.22;
+const SCALE_CARRY_EPS = 0.0016;
 
 type HandRippleInner = {
   enabled: boolean;
@@ -62,14 +75,21 @@ export function HandRippleProvider({
     };
   }, []);
 
+  const wakeRef = useRef(0);
+  const presenceRef = useRef(0);
+  /** Last palm sample keyed by quantized norm — Mediapipe often ~30Hz; RAF deltas would read as zero between samples. */
+  const mediapipeKeyRef = useRef<string | null>(null);
+  const normSnapPxRef = useRef<{ px: number; py: number } | null>(null);
+  const prevHandPxRef = useRef<{ x: number; y: number } | null>(null);
+  const workSetRef = useRef(new Set<number>());
+  const carryRef = useRef<number[]>([]);
+
   useEffect(() => {
     if (!enabled) return;
 
     let raf = 0;
-    let hadHand = false;
-    let lastRippleWork = 0;
+
     const tick = () => {
-      const now = performance.now();
       const rect = mapTargetRef.current?.getBoundingClientRect();
       const hand = handCanvasNormRef.current;
       const reg = registry.current;
@@ -79,58 +99,149 @@ export function HandRippleProvider({
         return;
       }
 
-      if (hand && now - lastRippleWork < 32) {
-        raf = requestAnimationFrame(tick);
-        return;
-      }
+      const now = performance.now();
+      const tsec = now / 1000;
+      const w = rect.width;
+      const h = rect.height;
 
       dampen.current.fill(0);
 
-      if (hand) lastRippleWork = now;
-
-      const w = rect.width;
-      const h = rect.height;
-      const tsec = performance.now() / 1000;
+      let presence = presenceRef.current;
+      let wake = wakeRef.current;
+      const minDim = Math.min(w, h);
 
       if (!hand) {
-        if (hadHand) {
-          for (const [, e] of reg) {
-            animate(e.tx, 0, DISPLACE_SPRING);
-            animate(e.ty, 0, DISPLACE_SPRING);
+        presence *= 0.87;
+        wake *= 0.87;
+        prevHandPxRef.current = null;
+        mediapipeKeyRef.current = null;
+        normSnapPxRef.current = null;
+      } else {
+        const hx = hand.x * w;
+        const hy = hand.y * h;
+        presence = Math.min(1, presence * 0.988 + 0.052);
+
+        const sampleKey = `${hand.x.toFixed(6)}:${hand.y.toFixed(6)}`;
+        let sampleJumpPx = 0;
+        if (mediapipeKeyRef.current !== sampleKey) {
+          const snap = normSnapPxRef.current;
+          if (snap && mediapipeKeyRef.current !== null) {
+            sampleJumpPx = Math.hypot(hx - snap.px, hy - snap.py);
+          }
+          mediapipeKeyRef.current = sampleKey;
+          normSnapPxRef.current = { px: hx, py: hy };
+        }
+
+        const prev = prevHandPxRef.current;
+        const rafDx = prev ? Math.hypot(hx - prev.x, hy - prev.y) : sampleJumpPx;
+        const palmMove = Math.max(rafDx, sampleJumpPx);
+
+        if (prev) {
+          const spur = Math.min(1, palmMove / Math.max(minDim * 0.0078, 1));
+          const moveBoost =
+            palmMove > minDim * 0.022 ? 0.95 : palmMove > minDim * 0.0065 ? 0.62 : palmMove > 0.72 ? 0.32 : 0.075;
+          const wakeBleed = palmMove < 2.85 ? 0.955 : palmMove < 11 ? 0.88 : 0.795;
+          wake = Math.min(1, wake * wakeBleed + spur * moveBoost + presence * 0.12);
+        } else {
+          wake = Math.min(1, wake * 0.9 + 0.46);
+        }
+        prevHandPxRef.current = { x: hx, y: hy };
+      }
+      presenceRef.current = presence;
+      wakeRef.current = wake;
+
+      const reachPx = rippleInfluenceReachPx(w, h);
+      /** Extra halo so retarded-wave tiles at the ROI rim still animate; width capped vs grid size. */
+      const marginPx = reachPx + minDim * 0.072;
+      const cellWpx = w / GRID_W;
+      const cellHpx = h / GRID_H;
+      const cellMin = Math.min(cellWpx, cellHpx);
+      const tcx = hand ? (hand.x * w) / cellWpx - 0.5 : 0;
+      const tcy = hand ? (hand.y * h) / cellHpx - 0.5 : 0;
+
+      const radialCells = Math.ceil(marginPx / cellMin) + 2;
+      /** Must cover displacement falloff (~`minDim * 0.392`), else rings clip at ROI edge. Still hard-capped for perf. */
+      const waveBandCells = Math.ceil((minDim * 0.392) / cellMin) + 3;
+      const mCells = clampScalar(Math.min(radialCells, Math.max(waveBandCells, 10), 20), 3, Math.max(GRID_W, GRID_H));
+
+      const fsx = clampScalar(Math.floor(tcx - mCells), 0, GRID_W - 1);
+      const fex = clampScalar(Math.ceil(tcx + mCells), 0, GRID_W - 1);
+      const fsy = clampScalar(Math.floor(tcy - mCells), 0, GRID_H - 1);
+      const fey = clampScalar(Math.ceil(tcy + mCells), 0, GRID_H - 1);
+
+      const work = workSetRef.current;
+      work.clear();
+
+      if (hand) {
+        for (let cy = fsy; cy <= fey; cy++) {
+          for (let cx = fsx; cx <= fex; cx++) {
+            work.add(tileFlatIndex(cx, cy));
           }
         }
-        hadHand = false;
-        raf = requestAnimationFrame(tick);
-        return;
       }
 
-      hadHand = true;
-      const hx = hand.x * w;
-      const hy = hand.y * h;
+      const carryPrev = carryRef.current;
+      for (let i = 0; i < carryPrev.length; i++) work.add(carryPrev[i]);
 
-      for (const [, e] of reg) {
-        const { cx, cy } = e;
+      const nextCarry: number[] = [];
+
+      const baseHx = hand ? hand.x * w : -99999;
+      const baseHy = hand ? hand.y * h : -99999;
+
+      for (const id of work) {
+        const cx = id % GRID_W;
+        const cy = Math.floor(id / GRID_W);
+        const e = reg.get(`${cx},${cy}`);
+        if (!e) continue;
+
         const tpx = ((cx + 0.5) / GRID_W) * w;
         const tpy = ((cy + 0.5) / GRID_H) * h;
-        const { influence, dx, dy } = rippleDisplacementPx({
-          tileCxPx: tpx,
-          tileCyPx: tpy,
-          handHxPx: hx,
-          handHyPx: hy,
-          canvasW: w,
-          canvasH: h,
-          timeSec: tsec,
-        });
-        dampen.current[tileFlatIndex(cx, cy)] = influence;
 
-        if (influence > 0.0025) {
-          animate(e.tx, dx, DISPLACE_SPRING);
-          animate(e.ty, dy, DISPLACE_SPRING);
-        } else {
-          animate(e.tx, 0, DISPLACE_SPRING);
-          animate(e.ty, 0, DISPLACE_SPRING);
+        let dx = 0;
+        let dy = 0;
+        let influence = 0;
+        let scale = 1;
+
+        if (hand) {
+          const res = rippleDisplacementPx({
+            tileCxPx: tpx,
+            tileCyPx: tpy,
+            handHxPx: baseHx,
+            handHyPx: baseHy,
+            canvasW: w,
+            canvasH: h,
+            timeSec: tsec,
+            presence,
+            wake,
+          });
+          dx = res.dx;
+          dy = res.dy;
+          influence = res.influence;
+          scale = res.scale;
+        }
+
+        dampen.current[id] = influence;
+
+        /** Springs per frame fight a moving ripple target (`dx`/`dy` change ~60fps) and read as mush.
+         *  Lerp snaps closely to computed wave while smoothing hand-off settles. */
+        const kBlend = hand ? FOLLOW_HAND : SETTLE_NO_HAND;
+        e.tx.set(e.tx.get() + (dx - e.tx.get()) * kBlend);
+        e.ty.set(e.ty.get() + (dy - e.ty.get()) * kBlend);
+        e.s.set(e.s.get() + (scale - e.s.get()) * kBlend);
+
+        const abx = Math.abs(e.tx.get());
+        const aby = Math.abs(e.ty.get());
+        const scl = Math.abs(e.s.get() - 1);
+        if (
+          influence > CARRY_EPS ||
+          abx + aby > CARRY_MOTION_EPS ||
+          scl > SCALE_CARRY_EPS
+        ) {
+          nextCarry.push(id);
         }
       }
+
+      carryRef.current = nextCarry;
 
       raf = requestAnimationFrame(tick);
     };
@@ -159,20 +270,22 @@ type ShellProps = {
   children: ReactNode;
 };
 
-/** motion shell + register — wraps the living/image layer inside reveal, not reveal itself */
+/** Motion shell + register — wraps the living/image layer inside reveal, not reveal itself */
 export function HandRippleTileShell({ cx, cy, rippleActive, children }: ShellProps) {
   const ctx = useHandRippleRegister();
 
   const txMv = useMemo(() => motionValue(0), []);
   const tyMv = useMemo(() => motionValue(0), []);
+  const sMv = useMemo(() => motionValue(1), []);
 
   useEffect(() => {
     if (!ctx?.enabled || !rippleActive) return;
     return ctx.register(cx, cy, {
       tx: txMv,
       ty: tyMv,
+      s: sMv,
     });
-  }, [ctx, rippleActive, cx, cy, txMv, tyMv]);
+  }, [ctx, rippleActive, cx, cy, txMv, tyMv, sMv]);
 
   if (!ctx?.enabled) return <>{children}</>;
 
@@ -188,6 +301,7 @@ export function HandRippleTileShell({ cx, cy, rippleActive, children }: ShellPro
         backfaceVisibility: 'hidden',
         x: txMv,
         y: tyMv,
+        scale: sMv,
         willChange: 'transform',
       }}
     >
