@@ -5,8 +5,8 @@ type Props = {
   error: HandTrackingErrorKind | null;
 };
 
-export function HandPocDevHud({ error }: Props) {
-  const hud = useMemo(() => {
+export function HandTrackingErrorBanner({ error }: Props) {
+  const message = useMemo(() => {
     if (error === 'denied')
       return 'Camera access was denied. Allow the camera to see tracking over the mosaic.';
     if (error === 'no_device') return 'No camera found.';
@@ -15,7 +15,7 @@ export function HandPocDevHud({ error }: Props) {
     return null;
   }, [error]);
 
-  if (!hud) return null;
+  if (!message) return null;
 
   return (
     <div
@@ -35,16 +35,6 @@ export function HandPocDevHud({ error }: Props) {
     >
       <div
         style={{
-          color: 'rgba(250,250,255,0.65)',
-          fontSize: 11,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-        }}
-      >
-        Dev — hand POC
-      </div>
-      <div
-        style={{
           maxWidth: 420,
           textAlign: 'center',
           padding: '8px 12px',
@@ -56,7 +46,7 @@ export function HandPocDevHud({ error }: Props) {
           border: '1px solid rgba(255,140,100,0.22)',
         }}
       >
-        {hud}
+        {message}
       </div>
     </div>
   );

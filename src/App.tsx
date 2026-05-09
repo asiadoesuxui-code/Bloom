@@ -8,7 +8,7 @@ import { loadSourceAssets, createFairSourcePicker, randomIntegerBelow } from './
 import { useHandTrackingRuntime } from './handTracking/useHandTrackingRuntime';
 import { HandRippleProvider } from './handTracking/HandRippleContext';
 import { HandTrackingToggle } from './handTracking/HandTrackingToggle';
-import { HandPocDevHud } from './handTracking/HandPocDevHud';
+import { HandTrackingErrorBanner } from './handTracking/HandTrackingErrorBanner';
 
 const CANVAS_BG = '#0e0f12';
 
@@ -27,16 +27,11 @@ export default function App() {
   const [living, setLiving] = useState(false);
   const [handTracking, setHandTracking] = useState(false);
 
-  const handPocMode =
-    import.meta.env.DEV &&
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).has('handpoc');
-
   const missingTiles = tiles.length === 0;
   const missingSources = sourceAssets.length === 0;
 
   const hasCells = cells.length > 0;
-  const handPipelineOn = hasCells && (handTracking || handPocMode);
+  const handPipelineOn = hasCells && handTracking;
 
   const handRt = useHandTrackingRuntime({
     enabled: handPipelineOn,
@@ -116,7 +111,6 @@ export default function App() {
             enabled={handTracking}
             onChange={setHandTracking}
             permissionDenied={handRt.error === 'denied'}
-            devPocUrl={handPocMode}
           />
 
           <div
@@ -127,12 +121,10 @@ export default function App() {
               aspectRatio: '16 / 9',
               maxHeight: 'calc(100svh - 200px)',
               borderRadius: 12,
-              outline: handPocMode && hasCells ? '1px dashed rgba(140,190,255,0.42)' : undefined,
-              outlineOffset: 4,
               boxSizing: 'border-box',
             }}
           >
-            {handPocMode && hasCells ? <HandPocDevHud error={handRt.error} /> : null}
+            {handTracking && hasCells ? <HandTrackingErrorBanner error={handRt.error} /> : null}
             <MosaicView
               ref={mosaicRef}
               generationId={generationId}
