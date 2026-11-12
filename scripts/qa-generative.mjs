@@ -19,6 +19,10 @@ const GRID_H = 34;
 const MAX_FAMILY_SHARE = 0.4;
 const MIN_REGION = 24;
 const MIN_LIGHTNESS_GAP = 0.08;
+const MAX_BG_FAMILIES = 3;
+const MAX_BG_BUSY = 0.18;
+const BG_LABELS = new Set(['sky', 'water', 'ground', 'leaf', 'stem']);
+const FLOWER_LABELS = new Set(['petal', 'centre']);
 
 const WARM = new Set(['poppy', 'red', 'pink', 'orange', 'yellow', 'brown']);
 const GREEN = new Set(['forest', 'green', 'lightgreen', 'seagreen']);
@@ -86,9 +90,55 @@ function checkScene(seed) {
     if (src.label === 'petal' && GREEN.has(key)) {
       failures.push(`petal used green family ${key}`);
     }
-    if ((src.label === 'leaf' || src.label === 'stem') && BLUE.has(key)) {
+    if ((src.label === 'leaf' || src.label === 'stem' || src.label === 'ground') && BLUE.has(key)) {
       failures.push(`${src.label} used blue family ${key}`);
     }
+  }
+
+  for (const label of BG_LABELS) {
+    const keys = byLabel.get(label);
+    if (!keys || keys.length === 0) continue;
+    const unique = new Set(keys);
+    if (unique.size > MAX_BG_FAMILIES) {
+      failures.push(`${label} uses ${unique.size} families`);
+    }
+  }
+
+  const keyAt = built.map((cell) => colorKey(cell.url));
+  const edgeRate = (accept, sameLabelOnly) => {
+    let edges = 0;
+    let disagree = 0;
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) {
+        const i = y * GRID_W + x;
+        const label = painted.cells[i].label;
+        if (!accept(label)) continue;
+        for (const [dx, dy] of [
+          [1, 0],
+          [0, 1],
+        ]) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx >= GRID_W || ny >= GRID_H) continue;
+          const j = ny * GRID_W + nx;
+          const next = painted.cells[j].label;
+          if (!accept(next)) continue;
+          // Background score stays inside one region. Flower score includes petal meeting centre.
+          if (sameLabelOnly && next !== label) continue;
+          edges += 1;
+          if (keyAt[i] !== keyAt[j]) disagree += 1;
+        }
+      }
+    }
+    return edges ? disagree / edges : 0;
+  };
+  const bgBusy = edgeRate((label) => BG_LABELS.has(label), true);
+  const flowerBusy = edgeRate((label) => FLOWER_LABELS.has(label), false);
+  if (bgBusy > MAX_BG_BUSY) {
+    failures.push(`background busyness ${bgBusy.toFixed(3)} > ${MAX_BG_BUSY}`);
+  }
+  if (flowerBusy < bgBusy + 0.04) {
+    failures.push(`background busyness ${bgBusy.toFixed(3)} is not clearly below flowers ${flowerBusy.toFixed(3)}`);
   }
 
   for (const [label, keys] of byLabel) {
@@ -118,7 +168,7 @@ function checkScene(seed) {
     if (!used.has(required)) failures.push(`missing palette colour ${required}`);
   }
 
-  return { seed, failures: [...new Set(failures)], built, painted, gap };
+  return { seed, failures: [...new Set(failures)], built, painted, gap, bgBusy, flowerBusy };
 }
 
 const results = [];
@@ -132,7 +182,9 @@ console.log(`seeds ${results.length}  failed ${failed.length}`);
 console.log('| seed | result | notes |');
 console.log('| --- | --- | --- |');
 for (const row of results) {
-  const notes = row.failures.length ? row.failures.slice(0, 3).join('; ') : `gap ${row.gap.toFixed(3)}`;
+  const notes = row.failures.length
+    ? row.failures.slice(0, 3).join('; ')
+    : `gap ${row.gap.toFixed(3)} bg ${row.bgBusy.toFixed(3)} flower ${row.flowerBusy.toFixed(3)}`;
   console.log(`| ${row.seed} | ${row.failures.length ? 'fail' : 'pass'} | ${notes} |`);
 }
 
@@ -189,7 +241,10 @@ await sharp({
   .composite(sheet)
   .png()
   .toFile(sheetPath);
-await fs.writeFile(path.join(outDir, 'generative-qa.json'), JSON.stringify(results.map(({ seed, failures, gap }) => ({ seed, failures, gap })), null, 2));
+await fs.writeFile(
+  path.join(outDir, 'generative-qa.json'),
+  JSON.stringify(results.map(({ seed, failures, gap, bgBusy, flowerBusy }) => ({ seed, failures, gap, bgBusy, flowerBusy })), null, 2),
+);
 console.log(`sheet ${sheetPath}`);
 
 await server.close();

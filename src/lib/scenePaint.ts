@@ -25,13 +25,17 @@ export type PaintedScene = {
 
 export type Rgb = { r: number; g: number; b: number };
 
-/** Families a label may use. Leaf blues are limited to seagreen (a green). */
+/**
+ * Families a label may use, light to dark.
+ * Each background region stays inside one short group of close colours.
+ * Navy is not a sky or water field. Leaves, stems, and ground contain no blue.
+ */
 export const LABEL_FAMILIES: Record<SceneLabel, readonly string[]> = {
-  sky: ['darkblue', 'midblue', 'seagreen', 'lightblue'],
-  water: ['darkblue', 'midblue', 'seagreen', 'lightblue'],
-  ground: ['brown', 'beige', 'green'],
-  leaf: ['forest', 'green', 'lightgreen', 'seagreen'],
-  stem: ['forest', 'green', 'lightgreen', 'seagreen'],
+  sky: ['lightblue', 'midblue', 'seagreen'],
+  water: ['lightblue', 'midblue', 'seagreen'],
+  ground: ['cream', 'beige', 'brown'],
+  leaf: ['lightgreen', 'green', 'forest'],
+  stem: ['lightgreen', 'green', 'forest'],
   petal: ['poppy', 'pink', 'blush', 'yellow', 'orange', 'cream', 'red'],
   centre: ['yellow', 'orange', 'brown', 'darkblue', 'cream'],
 };
@@ -172,9 +176,9 @@ export function paintFlowerScene(
     }
   }
 
-  colorByLabel(cells, gridW, 'sky', LABEL_FAMILIES.sky, means, rnd, seed + 1);
-  colorByLabel(cells, gridW, 'water', LABEL_FAMILIES.water, means, rnd, seed + 2);
-  colorByLabel(cells, gridW, 'ground', LABEL_FAMILIES.ground, means, rnd, seed + 3);
+  colorByLabel(cells, gridW, gridH, 'sky', LABEL_FAMILIES.sky, means, seed + 1, 'wash');
+  colorByLabel(cells, gridW, gridH, 'water', LABEL_FAMILIES.water, means, seed + 2, 'wash');
+  colorByLabel(cells, gridW, gridH, 'ground', LABEL_FAMILIES.ground, means, seed + 3, 'soft');
 
   const paintDisk = (
     cx: number,
@@ -286,9 +290,9 @@ export function paintFlowerScene(
     paintDisk(flower.x, flower.y, 1.7, 1.7, 0, 'centre', flower.id, centreRgb);
   }
 
-  // Recolour foliage so no single green dominates, after stems and leaves exist.
-  colorByLabel(cells, gridW, 'leaf', LABEL_FAMILIES.leaf, means, rnd, seed + 4);
-  colorByLabel(cells, gridW, 'stem', LABEL_FAMILIES.stem, means, rnd, seed + 5);
+  // One soft light-to-dark shading shared by leaves and stems. No teal, no blue.
+  colorByLabel(cells, gridW, gridH, 'leaf', LABEL_FAMILIES.leaf, means, seed + 4, 'soft');
+  colorByLabel(cells, gridW, gridH, 'stem', LABEL_FAMILIES.stem, means, seed + 4, 'soft');
 
   // Petals were blended at the rim. Snap each flower back to its family colour.
   for (const flower of flowers) {
@@ -309,11 +313,10 @@ export function paintFlowerScene(
     }
   }
 
-  // Flowers cover part of the sky and water. Rebalance what remains so one blue
-  // cannot take over the region.
-  colorByLabel(cells, gridW, 'sky', LABEL_FAMILIES.sky, means, rnd, seed + 6);
-  colorByLabel(cells, gridW, 'water', LABEL_FAMILIES.water, means, rnd, seed + 7);
-  colorByLabel(cells, gridW, 'ground', LABEL_FAMILIES.ground, means, rnd, seed + 8);
+  // Repaint what the flowers did not cover, so the background stays a slow wash.
+  colorByLabel(cells, gridW, gridH, 'sky', LABEL_FAMILIES.sky, means, seed + 1, 'wash');
+  colorByLabel(cells, gridW, gridH, 'water', LABEL_FAMILIES.water, means, seed + 2, 'wash');
+  colorByLabel(cells, gridW, gridH, 'ground', LABEL_FAMILIES.ground, means, seed + 3, 'soft');
 
   return { gridW, gridH, cells, centreFamilies };
 }
@@ -321,46 +324,104 @@ export function paintFlowerScene(
 function colorByLabel(
   cells: SceneCell[],
   gridW: number,
+  gridH: number,
   label: SceneLabel,
   families: readonly string[],
   means: Record<string, Rgb>,
-  rnd: () => number,
   seed: number,
+  kind: 'wash' | 'soft',
 ) {
   const usable = families.filter((f) => means[f]);
   if (usable.length === 0) return;
   const indices: number[] = [];
   for (let i = 0; i < cells.length; i++) if (cells[i]!.label === label) indices.push(i);
   if (indices.length === 0) return;
-  const ordered = [...indices].sort((a, b) => {
-    const ay = Math.floor(a / gridW);
-    const ax = a - ay * gridW;
-    const by = Math.floor(b / gridW);
-    const bx = b - by * gridW;
-    return fbm(ax * 0.18, ay * 0.18, seed) - fbm(bx * 0.18, by * 0.18, seed);
-  });
-  const bag = balancedBag(ordered.length, usable, rnd);
-  for (let i = 0; i < ordered.length; i++) {
-    const family = bag[i]!;
+  const field = (index: number) => {
+    const y = Math.floor(index / gridW);
+    const x = index - y * gridW;
+    const drift = fbm(x * 0.055, y * 0.055, seed);
+    if (kind === 'wash') return y / gridH + (drift - 0.5) * 0.22;
+    return drift;
+  };
+  const ordered = [...indices].sort((a, b) => field(a) - field(b) || a - b);
+  const bands = usable.length;
+  const base = Math.floor(ordered.length / bands);
+  let extra = ordered.length - base * bands;
+  let cursor = 0;
+  for (const family of usable) {
+    const count = base + (extra > 0 ? 1 : 0);
+    if (extra > 0) extra--;
     const rgb = means[family]!;
-    const cell = cells[ordered[i]!]!;
-    cell.r = rgb.r;
-    cell.g = rgb.g;
-    cell.b = rgb.b;
+    for (let k = 0; k < count; k++) {
+      const cell = cells[ordered[cursor++]!]!;
+      cell.r = rgb.r;
+      cell.g = rgb.g;
+      cell.b = rgb.b;
+    }
   }
+  dissolveSpecks(cells, gridW, gridH, label, usable, means);
 }
 
-function balancedBag(count: number, families: readonly string[], rnd: () => number): string[] {
-  const shuffled = shuffle(families, rnd);
-  const base = Math.floor(count / shuffled.length);
-  let extra = count - base * shuffled.length;
-  const bag: string[] = [];
-  for (const family of shuffled) {
-    const n = base + (extra > 0 ? 1 : 0);
-    if (extra > 0) extra--;
-    for (let i = 0; i < n; i++) bag.push(family);
+/** Drop isolated background tiles so neighbours usually share a family. */
+function dissolveSpecks(
+  cells: SceneCell[],
+  gridW: number,
+  gridH: number,
+  label: SceneLabel,
+  families: readonly string[],
+  means: Record<string, Rgb>,
+) {
+  const familyOf = (cell: SceneCell) => {
+    let best = families[0]!;
+    let bestD = Infinity;
+    for (const family of families) {
+      const rgb = means[family]!;
+      const d = (cell.r - rgb.r) ** 2 + (cell.g - rgb.g) ** 2 + (cell.b - rgb.b) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = family;
+      }
+    }
+    return best;
+  };
+  for (let pass = 0; pass < 2; pass++) {
+    const assigned = cells.map((cell) => (cell.label === label ? familyOf(cell) : ''));
+    for (let y = 0; y < gridH; y++) {
+      for (let x = 0; x < gridW; x++) {
+        const index = y * gridW + x;
+        if (cells[index]!.label !== label) continue;
+        const votes = new Map<string, number>();
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ] as const) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= gridW || ny >= gridH) continue;
+          const neighbour = assigned[ny * gridW + nx]!;
+          if (!neighbour) continue;
+          votes.set(neighbour, (votes.get(neighbour) ?? 0) + 1);
+        }
+        let winner = assigned[index]!;
+        let winnerN = 0;
+        for (const [family, n] of votes) {
+          if (n > winnerN) {
+            winner = family;
+            winnerN = n;
+          }
+        }
+        const own = votes.get(assigned[index]!) ?? 0;
+        if (winnerN >= 3 && winner !== assigned[index] && own <= 1) {
+          const rgb = means[winner]!;
+          cells[index]!.r = rgb.r;
+          cells[index]!.g = rgb.g;
+          cells[index]!.b = rgb.b;
+        }
+      }
+    }
   }
-  return bag;
 }
 
 function shuffle<T>(list: readonly T[], rnd: () => number): T[] {
