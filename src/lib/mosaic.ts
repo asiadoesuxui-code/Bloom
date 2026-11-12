@@ -23,7 +23,7 @@ import {
   isClearlyBlueDominantSample,
   isSunflowerSeedCentreSample,
 } from './sourceColorClassify';
-import { GRID_H, GRID_W, waveRankMap } from './waveOrder';
+import { GRID_H, GRID_W } from './waveOrder';
 
 export type MosaicFit = 'stretch' | 'cover';
 
@@ -539,13 +539,8 @@ export async function buildMosaicFromImageUrl(
   const meta = buildTileMeta(tilesWithLab(tiles));
   const buckets = bucketTilesByColor(meta);
 
-  const ranks = waveRankMap(gridW, gridH);
   const totalCells = gridW * gridH;
-  const maxRank = Math.max(1, totalCells - 1);
   const staggerSpanSec = REVEAL_TOTAL_MS / 1000 - REVEAL_TILE_DURATION_SEC;
-  const chaosMaxSec = staggerSpanSec * REVEAL_CHAOS_FRAC;
-  const rippleMaxSec = staggerSpanSec * REVEAL_RIPPLE_FRAC;
-  const ripplePhiRad = ripplePhaseRad(varietySeed);
 
   const samples: Array<[number, number, number]> = new Array(totalCells);
   for (let cy = 0; cy < gridH; cy++) {
@@ -555,6 +550,7 @@ export async function buildMosaicFromImageUrl(
     if (cy % 4 === 3) await yieldToMain();
   }
 
+  const bloomDelay = bloomDelaySeconds(samples, gridW, gridH, varietySeed || 1, staggerSpanSec);
   const cells: MosaicCell[] = [];
   let processed = 0;
 
@@ -569,17 +565,7 @@ export async function buildMosaicFromImageUrl(
       if (!choice) {
         throw new Error('No tiles available for mosaic');
       }
-      const rank = ranks.get(`${cx},${cy}`) ?? 0;
-      const baseDelaySec = (rank / maxRank) * staggerSpanSec;
-      const delaySec = Math.min(
-        staggerSpanSec,
-        Math.max(
-          0,
-          baseDelaySec +
-            revealChaosOffsetSec(cx, cy, varietySeed, chaosMaxSec) +
-            revealRippleOffsetSec(cx, cy, ripplePhiRad, rippleMaxSec),
-        ),
-      );
+      const delaySec = bloomDelay[cy * gridW + cx] ?? 0;
       const seed = hashSeed(cx, cy, choice.id);
       cells.push({
         cx,
@@ -624,22 +610,88 @@ function unitHash01(seed: number, cx: number, cy: number, salt: number): number 
   return (h >>> 0) / 0x1_0000_0000;
 }
 
-/** Blended two-noise offset in ~[-maxOffsetSec, maxOffsetSec] for less grid-like jitter. */
-function revealChaosOffsetSec(cx: number, cy: number, varietySeed: number, maxOffsetSec: number): number {
-  if (maxOffsetSec <= 0) return 0;
-  const u = unitHash01(varietySeed, cx, cy, 0x27d4eb2d);
-  const v = unitHash01(varietySeed, cx, cy, 0xf4a98d1d);
-  const blended = u + v - 1;
-  return blended * maxOffsetSec;
+/**
+ * Reveal order: brightest, most saturated flower centres first, then petals,
+ * then leaves and background. A little hash noise keeps the front from being a hard circle.
+ */
+function bloomDelaySeconds(
+  samples: ReadonlyArray<readonly [number, number, number]>,
+  gridW: number,
+  gridH: number,
+  seed: number,
+  spanSec: number,
+): Float32Array {
+  const n = gridW * gridH;
+  const pop = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const [r, g, b] = samples[i]!;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const chroma = (max - min) / 255;
+    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    pop[i] = chroma * (0.3 + 0.7 * lum);
+  }
+
+  const peaks: { i: number; pop: number }[] = [];
+  for (let y = 1; y < gridH - 1; y++) {
+    for (let x = 1; x < gridW - 1; x++) {
+      const i = y * gridW + x;
+      const p = pop[i]!;
+      if (p < 0.14) continue;
+      let maxNeighbor = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const np = pop[(y + dy) * gridW + (x + dx)]!;
+          if (np > maxNeighbor) maxNeighbor = np;
+        }
+      }
+      if (p + 0.004 >= maxNeighbor) peaks.push({ i, pop: p });
+    }
+  }
+  peaks.sort((a, b) => b.pop - a.pop);
+  const centres: { x: number; y: number }[] = [];
+  for (const peak of peaks) {
+    const x = peak.i % gridW;
+    const y = Math.floor(peak.i / gridW);
+    if (centres.some((c) => (c.x - x) ** 2 + (c.y - y) ** 2 < 36)) continue;
+    centres.push({ x, y });
+    if (centres.length >= 6) break;
+  }
+  if (centres.length === 0) {
+    let best = 0;
+    for (let i = 1; i < n; i++) if (pop[i]! > pop[best]!) best = i;
+    centres.push({ x: best % gridW, y: Math.floor(best / gridW) });
+  }
+
+  const dist = new Float32Array(n);
+  let maxD = 0.0001;
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      let d = 1e9;
+      for (const c of centres) {
+        const dx = (x - c.x) / gridW;
+        const dy = (y - c.y) / gridH;
+        const h = Math.hypot(dx, dy);
+        if (h < d) d = h;
+      }
+      const i = y * gridW + x;
+      dist[i] = d;
+      if (d > maxD) maxD = d;
+    }
+  }
+
+  const out = new Float32Array(n);
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      const i = y * gridW + x;
+      const t = dist[i]! / maxD;
+      const lead = pop[i]! * 0.2;
+      const noise = (unitHash01(seed, x, y, 0x51ed) - 0.5) * 0.16;
+      const u = Math.max(0, Math.min(1, t * (1 - lead) + noise));
+      out[i] = u * spanSec;
+    }
+  }
+  return out;
 }
 
-function ripplePhaseRad(varietySeed: number): number {
-  const u = Math.imul(varietySeed ^ 0x45d9f3b3, 0x9e3779b1) >>> 0;
-  return (u / 0x1_0000_0000) * Math.PI * 2;
-}
-
-/** Slow traveling bump along diagonals: sin((cx+cy)*k + φ) * amplitude. */
-function revealRippleOffsetSec(cx: number, cy: number, phiRad: number, amplitudeSec: number): number {
-  if (amplitudeSec <= 0) return 0;
-  return Math.sin((cx + cy) * REVEAL_RIPPLE_K + phiRad) * amplitudeSec;
-}

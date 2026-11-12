@@ -29,11 +29,14 @@ function loomCycleSec(fragment: number): number {
   return 1.6 + (fragment % 661) / 100;
 }
 
-/** Only ~20% stay static so the field feels busy */
+/**
+ * About one tile in five breathes. The old ~80% kept a compositor layer
+ * on most of the mosaic and fell to ~30fps under a 4x CPU throttle.
+ */
 function livingKindFromSeed(seed: number): TileLivingKind {
   const t = (Math.imul(seed ^ 0x85ebca6b, 0xc2b2ae35) >>> 0) % 100;
-  if (t < 20) return 'static';
-  if (t < 55) return 'pulse';
+  if (t < 78) return 'static';
+  if (t < 90) return 'pulse';
   return 'loom';
 }
 

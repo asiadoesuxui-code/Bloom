@@ -1,7 +1,8 @@
 import { FilesetResolver, HandLandmarker, type HandLandmarkerResult } from '@mediapipe/tasks-vision';
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react';
 import { handLandmarkerModelUrl, mediapipeWasmDirectoryUrl } from './mediapipeAssets';
-import { mapNormalizedImagePointToElementNorm, isNormInsideCanvas } from './mapHandToCanvas';
+import { mapHandReachToMosaic, isNormInsideCanvas } from './mapHandToCanvas';
+import type { ShockPulse } from './HandRippleContext';
 
 export type HandTrackingErrorKind = 'denied' | 'no_device' | 'not_found' | 'init_failed';
 
@@ -20,6 +21,7 @@ function palmAnchorFromLandmarks(hand: HandLandmarkerResult): { nx: number; ny: 
 export type UseHandTrackingRuntimeOptions = {
   enabled: boolean;
   mapTargetRef: RefObject<HTMLElement | null>;
+  shockRef?: MutableRefObject<ShockPulse | null>;
 };
 
 export type HandTrackingRuntime = {
@@ -46,9 +48,27 @@ async function createHandLandmarker(delegate: 'GPU' | 'CPU') {
   });
 }
 
+function palmIsOpen(hand: HandLandmarkerResult): boolean {
+  const lm = hand.landmarks[0];
+  if (!lm || lm.length < 21) return false;
+  const wrist = lm[0]!;
+  const tips = [8, 12, 16, 20];
+  const bases = [5, 9, 13, 17];
+  let tip = 0;
+  let base = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = lm[tips[i]!]!;
+    const b = lm[bases[i]!]!;
+    tip += Math.hypot(a.x - wrist.x, a.y - wrist.y);
+    base += Math.hypot(b.x - wrist.x, b.y - wrist.y);
+  }
+  return base > 0.04 && tip > base * 1.55;
+}
+
 export function useHandTrackingRuntime({
   enabled,
   mapTargetRef,
+  shockRef,
 }: UseHandTrackingRuntimeOptions): HandTrackingRuntime {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const landmarkerRef = useRef<HandLandmarker | null>(null);
@@ -56,17 +76,14 @@ export function useHandTrackingRuntime({
   const lastEmitRef = useRef(0);
   const handCanvasNormRef = useRef<HandCanvasNorm | null>(null);
   const handPresentRef = useRef(false);
+  const palmWasOpenRef = useRef(false);
+  const lastShockRef = useRef(0);
+  const flickTrailRef = useRef<{ x: number; y: number; t: number }[]>([]);
 
   const [error, setError] = useState<HandTrackingErrorKind | null>(null);
   const [isStreamActive, setStreamActive] = useState(false);
 
-  const mapToTarget = (nx: number, ny: number, vw: number, vh: number): HandCanvasNorm | null => {
-    const el = mapTargetRef.current;
-    if (!el) return handCanvasNormRef.current;
-    const rect = el.getBoundingClientRect();
-    if (rect.width < 2 || rect.height < 2) return handCanvasNormRef.current;
-    return mapNormalizedImagePointToElementNorm(nx, ny, vw, vh, rect.width, rect.height, true);
-  };
+  const mapToTarget = (nx: number, ny: number): HandCanvasNorm => mapHandReachToMosaic(nx, ny, true);
 
   useEffect(() => {
     if (!enabled) {
@@ -116,11 +133,28 @@ export function useHandTrackingRuntime({
         return;
       }
 
-      const mapped = mapToTarget(anchor.nx, anchor.ny, vw, vh);
-      if (mapped && now - lastEmitRef.current >= THROTTLE_MS) {
+      const mapped = mapToTarget(anchor.nx, anchor.ny);
+      if (now - lastEmitRef.current >= THROTTLE_MS) {
         lastEmitRef.current = now;
         handCanvasNormRef.current = mapped;
         handPresentRef.current = isNormInsideCanvas(mapped.x, mapped.y, 0.08);
+        const open = palmIsOpen(result);
+        const trail = flickTrailRef.current;
+        trail.push({ x: mapped.x, y: mapped.y, t: now });
+        while (trail.length > 0 && now - trail[0]!.t > 110) trail.shift();
+        const first = trail[0];
+        let flicked = false;
+        if (first && trail.length >= 2) {
+          const dist = Math.hypot(mapped.x - first.x, mapped.y - first.y);
+          const flickDt = (now - first.t) / 1000;
+          flicked = dist > 0.18 && flickDt > 0.03 && dist / flickDt > 1.7;
+        }
+        if (shockRef && now - lastShockRef.current > 900 && (flicked || (open && !palmWasOpenRef.current))) {
+          lastShockRef.current = now;
+          shockRef.current = { x: mapped.x, y: mapped.y, at: now };
+          trail.length = 0;
+        }
+        palmWasOpenRef.current = open;
       }
 
       rafRef.current = requestAnimationFrame(runFrame);

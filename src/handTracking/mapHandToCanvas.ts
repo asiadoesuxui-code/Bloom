@@ -43,6 +43,18 @@ function clamp01(n: number): number {
   return n;
 }
 
+/**
+ * Stretch the camera image so a hand that stays inside the frame can still
+ * reach every edge and corner of the mosaic.
+ */
+export function mapHandReachToMosaic(nx: number, ny: number, mirrorX: boolean): { x: number; y: number } {
+  const u = mirrorX ? 1 - nx : nx;
+  return {
+    x: clamp01((u - 0.5) / 0.7 + 0.5),
+    y: clamp01((ny - 0.5) / 0.7 + 0.5),
+  };
+}
+
 export function isNormInsideCanvas(x: number, y: number, pad = 0.02): boolean {
   return x >= -pad && x <= 1 + pad && y >= -pad && y <= 1 + pad;
 }

@@ -7,7 +7,7 @@ import { loadResolvedTiles } from './lib/tileUrls';
 import { loadSourceAssets, createFairSourcePicker, randomIntegerBelow } from './lib/sources';
 import { gridSizeForPortrait } from './lib/waveOrder';
 import { useHandTrackingRuntime, type HandCanvasNorm } from './handTracking/useHandTrackingRuntime';
-import { HandRippleProvider } from './handTracking/HandRippleContext';
+import { HandRippleProvider, type ShockPulse } from './handTracking/HandRippleContext';
 import { usePointerRipple } from './handTracking/usePointerRipple';
 import { HandTrackingToggle } from './handTracking/HandTrackingToggle';
 import { HandTrackingErrorBanner } from './handTracking/HandTrackingErrorBanner';
@@ -36,7 +36,17 @@ function useVisualViewportBox() {
       : read(),
   );
   useEffect(() => {
-    const update = () => setBox(read());
+    const update = () => {
+      const next = read();
+      setBox((prev) =>
+        Math.abs(prev.width - next.width) < 0.5 &&
+        Math.abs(prev.height - next.height) < 0.5 &&
+        Math.abs(prev.offsetTop - next.offsetTop) < 0.5 &&
+        Math.abs(prev.offsetLeft - next.offsetLeft) < 0.5
+          ? prev
+          : next,
+      );
+    };
     update();
     const vv = window.visualViewport;
     vv?.addEventListener('resize', update);
@@ -94,11 +104,13 @@ export default function App() {
   /** Ripple shells after the reveal, or sooner if hand tracking is already on. */
   const rippleOn = hasCells && (living || handTracking);
   const pointerCanvasNormRef = useRef<HandCanvasNorm | null>(null);
-  usePointerRipple(mosaicRef, pointerCanvasNormRef, rippleOn);
+  const shockRef = useRef<ShockPulse | null>(null);
+  usePointerRipple(mosaicRef, pointerCanvasNormRef, rippleOn, shockRef);
 
   const handRt = useHandTrackingRuntime({
     enabled: handPipelineOn,
     mapTargetRef: mosaicRef,
+    shockRef,
   });
 
   const landedRef = useRef(0);
@@ -202,6 +214,7 @@ export default function App() {
       handCanvasNormRef={handRt.handCanvasNormRef}
       pointerCanvasNormRef={pointerCanvasNormRef}
       mapTargetRef={mosaicRef}
+      shockRef={shockRef}
     >
       <div
         data-portrait={portrait ? 'true' : 'false'}
@@ -254,7 +267,6 @@ export default function App() {
               emptyLabel={
                 computeBusy ? 'Painting mosaic…' : 'Press generate to create your artwork'
               }
-              handTileRipple={hasCells}
               gridW={grid.gridW}
               gridH={grid.gridH}
               onTileLanded={onTileLanded}

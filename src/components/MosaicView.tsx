@@ -1,4 +1,3 @@
-import gsap from 'gsap';
 import {
   memo,
   forwardRef,
@@ -6,12 +5,11 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
-  type CSSProperties,
+  useState,
 } from 'react';
 import { getLivingMotionParams } from '../animations/tileLiving';
-import { revealGsParamsFromSeed, revealMicroFromSeed } from '../animations/tileReveal';
+import { revealGsParamsFromSeed } from '../animations/tileReveal';
 import type { MosaicCell } from '../lib/mosaic';
-import { HandRippleTileShell, tileFlatIndex, useHandRippleRegister } from '../handTracking/HandRippleContext';
 
 export type MosaicViewProps = {
   generationId: number;
@@ -19,8 +17,6 @@ export type MosaicViewProps = {
   canvasBg: string;
   living: boolean;
   emptyLabel: string;
-  /** Wrap tiles with hand ripple shell (expects HandRippleProvider above) */
-  handTileRipple?: boolean;
   gridW: number;
   gridH: number;
   /** Fired once per tile when its reveal animation has landed. */
@@ -29,188 +25,103 @@ export type MosaicViewProps = {
 
 type TileProps = {
   cell: MosaicCell;
-  living: boolean;
-  rippleShell: boolean;
   gridW: number;
   gridH: number;
-  onTileLanded?: () => void;
 };
 
-const LIVING_LAYER: CSSProperties = {
-  width: '100%',
-  height: '100%',
-  transformOrigin: '50% 50%',
-  backfaceVisibility: 'hidden',
-  borderRadius: 2,
-};
-
-const BloomTile = memo(function BloomTile({ cell, living, rippleShell, gridW, gridH, onTileLanded }: TileProps) {
+const BloomTile = memo(function BloomTile({ cell, gridW, gridH }: TileProps) {
   const { cx, cy, url, delaySec, seed } = cell;
   const livingParams = useMemo(() => getLivingMotionParams(seed), [seed]);
-  const handRipple = useHandRippleRegister();
-  const dampenRef = useRef(handRipple?.livingDampen);
-  dampenRef.current = handRipple?.livingDampen;
-
-  const cellRef = useRef<HTMLDivElement>(null);
-  const revealRef = useRef<HTMLDivElement>(null);
-  const livingScaleRef = useRef<HTMLDivElement>(null);
-  const onLandedRef = useRef(onTileLanded);
-  onLandedRef.current = onTileLanded;
-
-  useEffect(() => {
-    const scaleEl = livingScaleRef.current;
-    const revealEl = revealRef.current;
-    const cellEl = cellRef.current;
-    if (!scaleEl || !revealEl) return;
-
-    let tween: gsap.core.Tween | undefined;
-    let tickBlend: (() => void) | undefined;
-    let started = false;
-
-    const reset = () => {
-      tween?.kill();
-      tween = undefined;
-      gsap.killTweensOf(scaleEl);
-      gsap.set(scaleEl, { scale: 1, z: 0, force3D: true });
-    };
-
-    const start = () => {
-      if (started) return;
-      started = true;
-      const p = livingParams;
-      if (p.kind !== 'static' && cellEl) {
-        cellEl.style.overflow = 'visible';
-        cellEl.style.zIndex = String(4 + (seed & 31));
-      }
-      if (p.kind !== 'static') {
-        const zPeak = p.kind === 'pulse' ? 8 + (seed & 7) * 1.8 : 16 + (seed & 7) * 2.8;
-        const ease = p.kind === 'pulse' ? 'power2.inOut' : 'power3.inOut';
-        gsap.set(scaleEl, { transformOrigin: '50% 50%', force3D: true });
-        // Rest pose matches the reveal's last frame, then the swell begins at once.
-        tween = gsap.fromTo(
-          scaleEl,
-          { scale: 1, z: 0 },
-          {
-            scale: p.scalePeak,
-            z: zPeak,
-            duration: p.scaleHalfSec,
-            delay: 0,
-            ease,
-            repeat: -1,
-            yoyo: true,
-            force3D: true,
-          },
-        );
-        const dIdx = tileFlatIndex(cx, cy, gridW);
-        if (tween) {
-          const tw = tween;
-          tickBlend = () => {
-            const inf = dampenRef.current?.[dIdx] ?? 0;
-            tw.timeScale(0.06 + 0.94 * (1 - Math.min(1, inf)));
-          };
-          gsap.ticker.add(tickBlend);
-        }
-      }
-      onLandedRef.current?.();
-    };
-
-    const onEnd = (event: AnimationEvent) => {
-      if (event.target !== revealEl || event.animationName !== 'bloomTileReveal') return;
-      start();
-    };
-    revealEl.addEventListener('animationend', onEnd);
-    const params = revealGsParamsFromSeed(seed, delaySec);
-    const backup = window.setTimeout(start, (params.delaySec + params.transformDur) * 1000 + 24);
-
-    return () => {
-      revealEl.removeEventListener('animationend', onEnd);
-      window.clearTimeout(backup);
-      if (tickBlend) gsap.ticker.remove(tickBlend);
-      reset();
-    };
-  }, [seed, delaySec, livingParams, cx, cy, gridW]);
-
-  const livingLayer = (
-    <div ref={livingScaleRef} style={LIVING_LAYER}>
-      <img
-        src={url}
-        alt=""
-        draggable={false}
-        decoding="async"
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'fill',
-          display: 'block',
-        }}
-      />
-    </div>
-  );
+  const breathes = livingParams.kind !== 'static';
 
   return (
-    <div
-      ref={cellRef}
+    <img
+      src={url}
+      alt=""
+      draggable={false}
+      decoding="async"
+      data-bloom-tile
+      data-bloom-reveal
+      data-cx={cx}
+      data-cy={cy}
+      data-delay={delaySec}
+      data-seed={seed}
+      data-peak={breathes ? livingParams.scalePeak.toFixed(3) : ''}
+      data-breathe={breathes ? (livingParams.scaleHalfSec * 2).toFixed(3) : ''}
       style={{
         position: 'absolute',
         left: `${(cx * 100) / gridW}%`,
         top: `${(cy * 100) / gridH}%`,
         width: `${100 / gridW}%`,
         height: `${100 / gridH}%`,
-        overflow: 'hidden',
+        objectFit: 'fill',
+        display: 'block',
+        borderRadius: 2,
+        pointerEvents: 'none',
+        transformOrigin: '50% 50%',
       }}
-    >
-      <div
-        ref={revealRef}
-        data-bloom-reveal
-        data-delay={delaySec}
-        data-seed={seed}
-        style={{
-          width: '100%',
-          height: '100%',
-          transformOrigin: '50% 50%',
-          backfaceVisibility: 'hidden',
-          perspective: 900,
-        }}
-      >
-        {rippleShell ? (
-          <HandRippleTileShell cx={cx} cy={cy} rippleActive={living}>
-            {livingLayer}
-          </HandRippleTileShell>
-        ) : (
-          livingLayer
-        )}
-      </div>
-    </div>
+    />
   );
 });
 
-function applyRevealAnimations(root: HTMLElement): () => void {
+function applyRevealAnimations(root: HTMLElement, onEach: () => void, onDone: () => void): () => void {
   const reveals = Array.from(root.querySelectorAll<HTMLElement>('[data-bloom-reveal]'));
-
-  /** One timestamp for the whole batch — avoids ~2k per-tile layout effects drifting the stagger mid-queue. */
   const tAssign = performance.now();
+  let cancelled = false;
+  const pending = reveals
+    .map((el) => ({
+      el,
+      delay: Number(el.dataset.delay),
+      seed: Number(el.dataset.seed),
+    }))
+    .sort((a, b) => a.delay - b.delay);
+  let next = 0;
 
-  for (const revealEl of reveals) {
-    const delaySec = Number(revealEl.dataset.delay);
-    const seed = Number(revealEl.dataset.seed);
-    if (!Number.isFinite(delaySec) || !Number.isFinite(seed)) continue;
+  const onEnd = (event: AnimationEvent) => {
+    if (event.animationName !== 'bloomTileReveal') return;
+    const revealEl = event.target as HTMLElement;
+    if (!revealEl.hasAttribute('data-bloom-reveal')) return;
+    const dur = revealEl.dataset.breathe;
+    const peak = revealEl.dataset.peak;
+    revealEl.dataset.landed = '1';
+    if (dur && peak) {
+      revealEl.dataset.breatheStart = String(performance.now());
+      revealEl.style.setProperty('--bloom-peak', peak);
+      revealEl.style.animation = `bloomBreathe ${dur}s ease-in-out 0s infinite`;
+    } else {
+      revealEl.style.animation = 'none';
+    }
+    landed += 1;
+    onEach();
+    if (landed >= reveals.length) onDone();
+  };
+  let landed = 0;
+  root.addEventListener('animationend', onEnd);
 
-    const { rotateDeg, yPercent } = revealMicroFromSeed(seed);
-    const params = revealGsParamsFromSeed(seed, delaySec);
-    const elapsedSec = (performance.now() - tAssign) / 1000;
-    const delayLeft = Math.max(0, params.delaySec - elapsedSec);
-
-    revealEl.style.setProperty('--bloom-reveal-y-pct', String(yPercent));
-    revealEl.style.setProperty('--bloom-reveal-r-deg', String(rotateDeg));
-
-    revealEl.style.animation = `bloomTileReveal ${params.transformDur}s ${params.cssTimingFunction} ${delayLeft}s both`;
-  }
+  // Start each tile only as its delay arrives, and only a few dozen per frame.
+  // An animation on all 2040 tiles promotes every layer for the whole reveal.
+  const pump = () => {
+    if (cancelled) return;
+    const elapsed = (performance.now() - tAssign) / 1000;
+    let started = 0;
+    while (next < pending.length && started < 8 && pending[next]!.delay <= elapsed + 0.04) {
+      const tile = pending[next]!;
+      next += 1;
+      if (!Number.isFinite(tile.delay) || !Number.isFinite(tile.seed)) continue;
+      const params = revealGsParamsFromSeed(tile.seed, tile.delay);
+      const delayLeft = Math.max(0, tile.delay - elapsed);
+      tile.el.style.animation = `bloomTileReveal ${params.transformDur}s ${params.cssTimingFunction} ${delayLeft}s forwards`;
+      started += 1;
+    }
+    if (next < pending.length) requestAnimationFrame(pump);
+  };
+  requestAnimationFrame(pump);
 
   return () => {
+    cancelled = true;
+    root.removeEventListener('animationend', onEnd);
     for (const revealEl of reveals) {
       revealEl.style.animation = '';
-      revealEl.style.removeProperty('--bloom-reveal-y-pct');
-      revealEl.style.removeProperty('--bloom-reveal-r-deg');
     }
   };
 }
@@ -222,7 +133,6 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
     canvasBg,
     living,
     emptyLabel,
-    handTileRipple = false,
     gridW,
     gridH,
     onTileLanded,
@@ -231,12 +141,24 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
 ) {
   const hasTiles = cells.length > 0;
   const mosaicGridRef = useRef<HTMLDivElement>(null);
+  const [sheen, setSheen] = useState(false);
 
-  /** Bulk-assign after all tiles commit. One `performance.now()` for the batch — avoids ~2k `useLayoutEffect`s stretching the stagger while the queue runs. Depends on `cells` with `generationId` so `living`/`ripple` toggles alone do not reschedule reveal. */
+  useEffect(() => {
+    setSheen(false);
+  }, [generationId]);
+
+  const onEachRef = useRef(onTileLanded);
+  onEachRef.current = onTileLanded;
+
+  /** Bulk-assign after all tiles commit. Chunked so one frame does not style every tile. */
   useLayoutEffect(() => {
     const root = mosaicGridRef.current;
     if (!root || cells.length === 0) return;
-    return applyRevealAnimations(root);
+    return applyRevealAnimations(
+      root,
+      () => onEachRef.current?.(),
+      () => setSheen(true),
+    );
   }, [generationId, cells]);
 
   return (
@@ -259,23 +181,34 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
         <div
           ref={mosaicGridRef}
           key={generationId}
+          data-living={living ? '1' : '0'}
           style={{
             position: 'relative',
             width: '100%',
             height: '100%',
+            pointerEvents: 'none',
           }}
         >
           {cells.map((cell) => (
             <BloomTile
               key={`${generationId}-${cell.cx}-${cell.cy}`}
               cell={cell}
-              living={living}
-              rippleShell={handTileRipple}
               gridW={gridW}
               gridH={gridH}
-              onTileLanded={onTileLanded}
             />
           ))}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+              background:
+                'linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.55) 50%, transparent 62%)',
+              opacity: 0,
+              animation: sheen ? 'bloomSheen 1.05s ease-out 1' : undefined,
+            }}
+          />
         </div>
       ) : (
         <div
