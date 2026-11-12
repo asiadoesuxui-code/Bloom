@@ -5,15 +5,17 @@ import { parseTileKeysFromId } from './tileKeys';
 import {
   isBlueCeramicFamily,
   isBrownCeramicFamily,
-  isGreenLeaningSample,
+  isDarkForestSample,
   isLeafyGreenCeramicFamily,
   isLightNeutralCeramicFamily,
   isLightNeutralSample,
+  isLilyWaterCeramicFamily,
+  isLilyWaterSample,
   isScarletCeramicFamily,
+  isTrueScarletSample,
   shouldSuppressConflictingEarthTones,
   isBrightGoldenFlowerSample,
   isClearlyBlueDominantSample,
-  isClearlyScarletOrMagentaRedSample,
   isSunflowerSeedCentreSample,
 } from './sourceColorClassify';
 import { GRID_H, GRID_W, waveRankMap } from './waveOrder';
@@ -168,20 +170,22 @@ function eligibleColorKeys(
   }
 
   /**
-   * Sunflower.png: warm petals satisfy `isWarmBrownOrangeSample`, which turns OFF global blue/brown
-   * suppression on foliage rules — so blues and true reds (`red`, `poppy`) can win on luminance.
-   * Drop them unless the cell is actually blue- or true-red-dominant.
+   * `poppy` and `red` are scarlet ceramics. Pink and magenta stay on `pink` / `blush`.
+   * Sunflower gold also fails this, which keeps the old sunflower red gate.
    */
-  if (stem === 'sunflower') {
-    if (!isClearlyScarletOrMagentaRedSample(r, g, b)) {
-      for (const k of [...keys]) {
-        if (isScarletCeramicFamily(k)) keys.delete(k);
-      }
+  if (!isTrueScarletSample(r, g, b)) {
+    for (const k of [...keys]) {
+      if (isScarletCeramicFamily(k)) keys.delete(k);
     }
-    if (!isClearlyBlueDominantSample(r, g, b)) {
-      for (const k of [...keys]) {
-        if (isBlueCeramicFamily(k)) keys.delete(k);
-      }
+  }
+
+  /**
+   * Sunflower.png: warm petals satisfy `isWarmBrownOrangeSample`, which turns OFF global blue/brown
+   * suppression on foliage rules — so blues can win on luminance. Drop them unless the cell is blue.
+   */
+  if (stem === 'sunflower' && !isClearlyBlueDominantSample(r, g, b)) {
+    for (const k of [...keys]) {
+      if (isBlueCeramicFamily(k)) keys.delete(k);
     }
   }
 
@@ -207,8 +211,8 @@ function eligibleColorKeys(
     keys.delete('seagreen');
   }
 
-  // Forest is a foliage green, not a dark-neutral stand-in.
-  if (!isGreenLeaningSample(r, g, b)) {
+  // Forest only on the darkest green. Mid-tone leaves stay `green` / `lightgreen`.
+  if (!isDarkForestSample(r, g, b)) {
     keys.delete('forest');
   }
 
@@ -219,7 +223,26 @@ function eligibleColorKeys(
     }
   }
 
-  if (keys.size === 0) return new Set(all);
+  /**
+   * Lily water reads as dark olive because of reflected pads. Force it onto
+   * blue / teal ceramics. Pads stay on the green path above.
+   */
+  if (stem === 'lily' && isLilyWaterSample(r, g, b)) {
+    const water = new Set(all.filter((k) => isLilyWaterCeramicFamily(k)));
+    if (water.size > 0) return water;
+  }
+
+  if (keys.size === 0) {
+    const fallback = new Set(all);
+    if (!isTrueScarletSample(r, g, b)) {
+      for (const k of [...fallback]) {
+        if (isScarletCeramicFamily(k)) fallback.delete(k);
+      }
+    }
+    if (!isDarkForestSample(r, g, b)) fallback.delete('forest');
+    if (fallback.size > 0) return fallback;
+    return new Set(all);
+  }
   return keys;
 }
 

@@ -9,8 +9,7 @@ export function isBlueCeramicFamily(colorKey: string): boolean {
 }
 
 /**
- * A cell with a real green cast. `forest` is only eligible here, so it can join
- * the leafy greens without standing in for charcoal, teal shadow, or a grey wall.
+ * A cell with a real green cast. Used to keep `forest` off charcoal and grey walls.
  */
 export function isGreenLeaningSample(r: number, g: number, b: number): boolean {
   const greenExcess = g - 0.5 * (r + b);
@@ -18,6 +17,71 @@ export function isGreenLeaningSample(r: number, g: number, b: number): boolean {
   if (b > g + 6) return false;
   if (r > g + 14) return false;
   return true;
+}
+
+/**
+ * Only the dark mass of a leaf. Mid-tone foliage stays on `green` / `lightgreen`
+ * so a field of pads does not collapse into `forest`.
+ */
+export function isDarkForestSample(r: number, g: number, b: number): boolean {
+  if (!isGreenLeaningSample(r, g, b)) return false;
+  const sum = r + g + b;
+  if (sum > 150) return false;
+  if (g > 72) return false;
+  return true;
+}
+
+/** Pink and magenta: blue participates, so these are not scarlet. */
+export function isPinkOrMagentaSample(r: number, g: number, b: number): boolean {
+  if (r < 90) return false;
+  if (b > g + 6 && r > g + 12 && r >= b - 30) return true;
+  if (b > 95 && g > 80 && r > g && r > b && b > r * 0.48 && r < 245 && g > 70) return true;
+  return false;
+}
+
+/**
+ * Blood red / poppy scarlet. Pink, magenta, orange, and gold fail this.
+ * `poppy` and `red` ceramics are legal only here.
+ */
+export function isTrueScarletSample(r: number, g: number, b: number): boolean {
+  if (isPinkOrMagentaSample(r, g, b)) return false;
+  if (r < 120) return false;
+  if (g > 140) return false;
+  if (r < g + 72) return false;
+  if (r < b + 58) return false;
+  if (b > g + 8) return false;
+  return true;
+}
+
+/** Lily pads: a clear green cast, bluer water excluded. */
+export function isLilyPadSample(r: number, g: number, b: number): boolean {
+  const greenExcess = g - 0.5 * (r + b);
+  return greenExcess >= 12 && g > b + 18;
+}
+
+/**
+ * Lily water is the dark, non-floral ground that is not a pad.
+ * It is often brown-green from reflections, so colour distance alone paints it as foliage.
+ */
+export function isLilyWaterSample(r: number, g: number, b: number): boolean {
+  if (isPinkOrMagentaSample(r, g, b)) return false;
+  if (isLightNeutralSample(r, g, b)) return false;
+  if (isTrueScarletSample(r, g, b)) return false;
+  if (isLilyPadSample(r, g, b)) return false;
+  return true;
+}
+
+/** Blues plus teal. Lily water is limited to these. */
+export function isLilyWaterCeramicFamily(colorKey: string): boolean {
+  switch (colorKey.toLowerCase()) {
+    case 'lightblue':
+    case 'midblue':
+    case 'darkblue':
+    case 'seagreen':
+      return true;
+    default:
+      return false;
+  }
 }
 
 /** Foliage ceramics. `forest` belongs with `green`, `lightgreen`, and `seagreen`. */
