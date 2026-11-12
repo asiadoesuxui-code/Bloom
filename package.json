@@ -11,8 +11,7 @@
     "prebuild": "npm run optimize:assets && npm run build:index && npm run vendor:mediapipe",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "qa:scene": "node scripts/qa-generative.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.21",

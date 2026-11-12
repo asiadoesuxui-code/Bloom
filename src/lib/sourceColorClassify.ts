@@ -105,10 +105,79 @@ export function isScarletCeramicFamily(colorKey: string): boolean {
   return key === 'red' || key === 'poppy';
 }
 
-/** Pale petal and paper colours. They stay eligible on light grounds. */
+/** Pale petal and paper colours. They stay eligible only on the samples named below. */
 export function isLightNeutralCeramicFamily(colorKey: string): boolean {
   const key = colorKey.toLowerCase();
   return key === 'cream' || key === 'blush';
+}
+
+/** Blues and the teal ceramic. These stay off warm flowers. */
+export function isCoolCeramicFamily(colorKey: string): boolean {
+  switch (colorKey.toLowerCase()) {
+    case 'lightblue':
+    case 'midblue':
+    case 'darkblue':
+    case 'seagreen':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Paper white and off-white. Chroma is tiny and blue does not lead,
+ * so a pale sky does not qualify.
+ */
+export function isGenuineNearWhiteSample(r: number, g: number, b: number): boolean {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (r + g + b < 700) return false;
+  if (max - min > 16) return false;
+  if (min < 214) return false;
+  if (b > r + 3 || b > g + 3) return false;
+  return true;
+}
+
+/** A light cell with a blue cast: pale sky, not paper and not beige. */
+export function isPaleBlueSample(r: number, g: number, b: number): boolean {
+  if (b < 130) return false;
+  if (r + g + b < 380) return false;
+  if (b + 4 < r && b + 4 < g) return false;
+  return b >= r - 2 && b >= g - 6;
+}
+
+/**
+ * A light pink petal. Dusty beige has blue at or below green, so it stays beige.
+ * Pink lifts blue toward green.
+ */
+export function isPalePinkSample(r: number, g: number, b: number): boolean {
+  if (r + g + b < 520 || r < 175) return false;
+  if (r < g + 28 || r < b + 18) return false;
+  if (b < g + 8) return false;
+  if (b > r - 8) return false;
+  const spread = Math.max(r, g, b) - Math.min(r, g, b);
+  return spread >= 20 && spread < 95;
+}
+
+/** Red, orange, yellow, pink, or brown. Green leaves and blue sky fail this. */
+export function isWarmSample(r: number, g: number, b: number): boolean {
+  if (isClearlyBlueDominantSample(r, g, b) || isPaleBlueSample(r, g, b)) return false;
+  if (isGreenLeaningSample(r, g, b)) return false;
+  if (b > r + 12 && b > g + 8) return false;
+  if (g > r + 18 && g > b + 12) return false;
+  return r >= b - 2 && r + g > b * 1.55;
+}
+
+/**
+ * A shadow inside a warm flower: dark, with red clearly ahead of green and blue.
+ * A neutral or green shadow stays out, so foliage does not turn brown.
+ */
+export function isDarkWarmSample(r: number, g: number, b: number): boolean {
+  const sum = r + g + b;
+  if (sum > 320 || sum < 24) return false;
+  if (b > r + 6) return false;
+  if (g > r - 4) return false;
+  return r > g + 18 && r > b + 14;
 }
 
 /**

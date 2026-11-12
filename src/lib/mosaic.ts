@@ -5,20 +5,24 @@ import { parseTileKeysFromId } from './tileKeys';
 import {
   isBlueCeramicFamily,
   isBrownCeramicFamily,
+  isCoolCeramicFamily,
   isDarkForestSample,
+  isDarkWarmSample,
+  isGenuineNearWhiteSample,
   isGreenLeaningSample,
   isLeafyGreenCeramicFamily,
-  isLightNeutralCeramicFamily,
-  isLightNeutralSample,
+  isPaleBlueSample,
+  isPalePinkSample,
+  isPinkOrMagentaSample,
   isRedPinkOrOrangeHue,
   isShadedRedSample,
   isTrueScarletSample,
+  isWarmSample,
   shouldSuppressConflictingEarthTones,
   isBrightGoldenFlowerSample,
   isClearlyBlueDominantSample,
   isSunflowerSeedCentreSample,
 } from './sourceColorClassify';
-import { LABEL_FAMILIES, type PaintedScene } from './scenePaint';
 import { GRID_H, GRID_W, waveRankMap } from './waveOrder';
 
 export type MosaicFit = 'stretch' | 'cover';
@@ -159,6 +163,8 @@ function eligibleColorKeys(
   b: number,
   lab: Oklab,
   sourceStem: string | undefined,
+  /** Share of the eight neighbours that read as warm. A dark cell in that company stays warm. */
+  warmNeighbourFraction = 0,
 ): Set<string> {
   const all = [...buckets.keys()];
   let keys = new Set(all);
@@ -207,35 +213,102 @@ function eligibleColorKeys(
     keys.delete('forest');
   }
 
-  // Cream and blush are petal and paper neutrals. A pale cell must not lose them.
-  if (isLightNeutralSample(r, g, b)) {
-    for (const k of all) {
-      if (isLightNeutralCeramicFamily(k)) keys.add(k);
+  // The sunflower seed disk is brown and nothing else. Blue, red, and green were winning the shadow.
+  const darkSeedDisk =
+    stem === 'sunflower' &&
+    !isGreenLeaningSample(r, g, b) &&
+    r + g + b < 270 &&
+    r < 165 &&
+    g < 115 &&
+    b < 95;
+  const seedCentre = stem === 'sunflower' && (isSunflowerSeedCentreSample(r, g, b) || darkSeedDisk);
+  if (seedCentre) {
+    const brown = new Set(all.filter((k) => isBrownCeramicFamily(k)));
+    if (brown.size > 0) return brown;
+  }
+
+  if (!isTrueScarletSample(r, g, b)) keys.delete('poppy');
+  if (!isTrueScarletSample(r, g, b) && !isShadedRedSample(r, g, b)) keys.delete('red');
+  if (isRedPinkOrOrangeHue(r, g, b)) keys.delete('brown');
+
+  // Cream is paper white. Pale sky stays light blue; a light warm ground stays beige.
+  if (!isGenuineNearWhiteSample(r, g, b)) keys.delete('cream');
+  if (!isPalePinkSample(r, g, b)) keys.delete('blush');
+  if (isPaleBlueSample(r, g, b) || isClearlyBlueDominantSample(r, g, b)) {
+    for (const k of ['cream', 'blush', 'beige', 'yellow', 'orange', 'brown', 'pink', 'red', 'poppy']) {
+      keys.delete(k);
+    }
+    // A bright sky stays on light blue. Deeper blue can use the darker families.
+    if (b > 170 && r + g + b > 440) {
+      keys.delete('midblue');
+      keys.delete('darkblue');
+      keys.delete('seagreen');
     }
   }
 
-  // Sunflower seeds stay brown. Everywhere else, a shaded red or pink keeps that hue.
-  const seedCentre = stem === 'sunflower' && isSunflowerSeedCentreSample(r, g, b);
-  if (seedCentre) {
-    keys.delete('poppy');
-    keys.delete('red');
-    keys.add('brown');
-  } else {
-    if (!isTrueScarletSample(r, g, b)) keys.delete('poppy');
-    if (!isTrueScarletSample(r, g, b) && !isShadedRedSample(r, g, b)) keys.delete('red');
-    if (isRedPinkOrOrangeHue(r, g, b)) keys.delete('brown');
+  const banCool =
+    !isClearlyBlueDominantSample(r, g, b) &&
+    !(isPaleBlueSample(r, g, b) && warmNeighbourFraction < 0.5) &&
+    (isWarmSample(r, g, b) || isDarkWarmSample(r, g, b) || warmNeighbourFraction >= 0.5);
+  if (banCool) {
+    for (const k of [...keys]) {
+      if (isCoolCeramicFamily(k)) keys.delete(k);
+    }
+    const darkInWarm =
+      r + g + b < 300 &&
+      !isGreenLeaningSample(r, g, b) &&
+      (isDarkWarmSample(r, g, b) || warmNeighbourFraction >= 0.5);
+    if (darkInWarm) {
+      for (const k of [...keys]) {
+        if (isLeafyGreenCeramicFamily(k) || k === 'yellow' || k === 'cream' || k === 'lightgreen') keys.delete(k);
+      }
+      if (isShadedRedSample(r, g, b) || isTrueScarletSample(r, g, b)) keys.add('red');
+      if (isPinkOrMagentaSample(r, g, b)) keys.add('pink');
+      if (![...keys].some((k) => k === 'red' || k === 'pink' || k === 'brown' || k === 'poppy' || k === 'orange')) {
+        keys.add('brown');
+      }
+    }
   }
 
-  if (keys.size === 0) return fallbackFamilies(all, r, g, b);
+  // Sunflower petals stay yellow. A dark centre already returned brown above.
+  if (stem === 'sunflower') {
+    keys.delete('red');
+    keys.delete('poppy');
+    if (!isPinkOrMagentaSample(r, g, b)) {
+      keys.delete('pink');
+      keys.delete('blush');
+    }
+  }
+
+  if (keys.size === 0) keys = fallbackFamilies(all, r, g, b, banCool);
+  if (stem === 'sunflower') {
+    keys.delete('red');
+    keys.delete('poppy');
+    keys.delete('pink');
+    keys.delete('blush');
+    if (keys.size === 0) keys.add('brown');
+  }
   return keys;
 }
 
-function fallbackFamilies(all: string[], r: number, g: number, b: number): Set<string> {
+function fallbackFamilies(all: string[], r: number, g: number, b: number, banCool: boolean): Set<string> {
   const fallback = new Set(all);
   if (!isTrueScarletSample(r, g, b)) fallback.delete('poppy');
   if (!isTrueScarletSample(r, g, b) && !isShadedRedSample(r, g, b)) fallback.delete('red');
   if (isRedPinkOrOrangeHue(r, g, b)) fallback.delete('brown');
   if (!isDarkForestSample(r, g, b)) fallback.delete('forest');
+  if (!isGenuineNearWhiteSample(r, g, b)) fallback.delete('cream');
+  if (!isPalePinkSample(r, g, b)) fallback.delete('blush');
+  if (isPaleBlueSample(r, g, b) || isClearlyBlueDominantSample(r, g, b)) {
+    for (const k of ['cream', 'blush', 'beige', 'yellow', 'orange', 'brown', 'pink', 'red', 'poppy']) {
+      fallback.delete(k);
+    }
+  }
+  if (banCool) {
+    for (const k of [...fallback]) {
+      if (isCoolCeramicFamily(k)) fallback.delete(k);
+    }
+  }
   if (fallback.size > 0) return fallback;
   return new Set(all);
 }
@@ -251,12 +324,13 @@ function pickTileForPixel(
   sourceStem: string | undefined,
   /** When set, photo-specific gates are skipped and only these families compete. */
   restrictKeys?: ReadonlySet<string> | null,
+  warmNeighbourFraction = 0,
 ): TileMeta | null {
   const sampleLab = rgbToOklab(r, g, b);
 
   let eligible = restrictKeys
     ? new Set([...restrictKeys].filter((key) => (buckets.get(key)?.length ?? 0) > 0))
-    : eligibleColorKeys(buckets, r, g, b, sampleLab, sourceStem);
+    : eligibleColorKeys(buckets, r, g, b, sampleLab, sourceStem, warmNeighbourFraction);
 
   const famDists: { key: string; d2: number }[] = [];
   for (const key of eligible) {
@@ -418,74 +492,27 @@ async function yieldToMain(): Promise<void> {
   });
 }
 
-function familiesForSceneCell(scene: PaintedScene, index: number): ReadonlySet<string> {
-  const cell = scene.cells[index]!;
-  if (cell.label === 'centre' && cell.flowerId > 0) {
-    const listed = scene.centreFamilies[cell.flowerId];
-    if (listed && listed.length > 0) return new Set(listed);
+function warmNeighbourFraction(
+  samples: ReadonlyArray<readonly [number, number, number]>,
+  cx: number,
+  cy: number,
+  gridW: number,
+  gridH: number,
+): number {
+  let warm = 0;
+  let seen = 0;
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      if (dx === 0 && dy === 0) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 0 || y < 0 || x >= gridW || y >= gridH) continue;
+      seen += 1;
+      const [r, g, b] = samples[y * gridW + x]!;
+      if (isWarmSample(r, g, b)) warm += 1;
+    }
   }
-  return new Set(LABEL_FAMILIES[cell.label]);
-}
-
-/** Tile a painted scene. Labels choose the family set; colour chooses within it. */
-export function buildMosaicFromScene(
-  tiles: ResolvedTile[],
-  varietySeed: number,
-  scene: PaintedScene,
-): MosaicCell[] {
-  const gridW = scene.gridW;
-  const gridH = scene.gridH;
-  const meta = buildTileMeta(tilesWithLab(tiles));
-  const buckets = bucketTilesByColor(meta);
-  const ranks = waveRankMap(gridW, gridH);
-  const totalCells = gridW * gridH;
-  const maxRank = Math.max(1, totalCells - 1);
-  const staggerSpanSec = REVEAL_TOTAL_MS / 1000 - REVEAL_TILE_DURATION_SEC;
-  const chaosMaxSec = staggerSpanSec * REVEAL_CHAOS_FRAC;
-  const rippleMaxSec = staggerSpanSec * REVEAL_RIPPLE_FRAC;
-  const ripplePhiRad = ripplePhaseRad(varietySeed);
-  const cells: MosaicCell[] = [];
-
-  for (let i = 0; i < scene.cells.length; i++) {
-    const painted = scene.cells[i]!;
-    const cx = i % gridW;
-    const cy = Math.floor(i / gridW);
-    const choice = pickTileForPixel(
-      painted.r,
-      painted.g,
-      painted.b,
-      cx,
-      cy,
-      buckets,
-      varietySeed,
-      undefined,
-      familiesForSceneCell(scene, i),
-    );
-    if (!choice) throw new Error(`No tile for ${painted.label} cell ${cx},${cy}`);
-    const rank = ranks.get(`${cx},${cy}`) ?? 0;
-    const baseDelaySec = (rank / maxRank) * staggerSpanSec;
-    const delaySec = Math.min(
-      staggerSpanSec,
-      Math.max(
-        0,
-        baseDelaySec +
-          revealChaosOffsetSec(cx, cy, varietySeed, chaosMaxSec) +
-          revealRippleOffsetSec(cx, cy, ripplePhiRad, rippleMaxSec),
-      ),
-    );
-    cells.push({
-      cx,
-      cy,
-      url: choice.url,
-      delaySec,
-      seed: hashSeed(cx, cy, choice.id),
-    });
-  }
-
-  if (cells.length !== totalCells) {
-    throw new Error('Scene grid does not match the painted cells');
-  }
-  return cells;
+  return seen === 0 ? 0 : warm / seen;
 }
 
 export async function buildMosaicFromImageUrl(
@@ -534,10 +561,11 @@ export async function buildMosaicFromImageUrl(
   for (let cy = 0; cy < gridH; cy++) {
     for (let cx = 0; cx < gridW; cx++) {
       const [r, g, b] = samples[cy * gridW + cx]!;
+      const warmAround = warmNeighbourFraction(samples, cx, cy, gridW, gridH);
       const stemKey = contrastingStemFamily(samples, cx, cy, gridW, gridH);
       const choice = stemKey
         ? pickTileForPixel(r, g, b, cx, cy, buckets, varietySeed, sourceStem, new Set([stemKey]))
-        : pickTileForPixel(r, g, b, cx, cy, buckets, varietySeed, sourceStem);
+        : pickTileForPixel(r, g, b, cx, cy, buckets, varietySeed, sourceStem, null, warmAround);
       if (!choice) {
         throw new Error('No tiles available for mosaic');
       }

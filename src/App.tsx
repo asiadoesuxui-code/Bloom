@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react';
-import { Chrome, type PictureMode } from './components/Chrome';
+import { Chrome } from './components/Chrome';
 import { MosaicView } from './components/MosaicView';
-import { buildMosaicFromImageUrl, buildMosaicFromScene, revealLivingHoldMs, type MosaicCell } from './lib/mosaic';
-import { familyMeans, paintFlowerScene } from './lib/scenePaint';
+import { buildMosaicFromImageUrl, revealLivingHoldMs, type MosaicCell } from './lib/mosaic';
 import { preloadMosaicTileUrls } from './lib/preloadMosaicTiles';
 import { loadResolvedTiles } from './lib/tileUrls';
 import { loadSourceAssets, createFairSourcePicker, randomIntegerBelow } from './lib/sources';
@@ -19,9 +18,7 @@ type Phase = 'idle' | 'computing' | 'revealing' | 'done';
 
 type SourceChoice = { url: string; stem: string };
 
-type LastBuild =
-  | { mode: 'classic'; choice: SourceChoice; seed: number }
-  | { mode: 'original'; seed: number };
+type LastBuild = { choice: SourceChoice; seed: number };
 
 function usePortraitViewport(): boolean {
   const [portrait, setPortrait] = useState(() =>
@@ -44,7 +41,6 @@ export default function App() {
   const sourcePicker = useMemo(() => createFairSourcePicker(sourceAssets), [sourceAssets]);
   const lastPickedStemRef = useRef<string | null>(null);
   const lastBuildRef = useRef<LastBuild | null>(null);
-  const [pictureMode, setPictureMode] = useState<PictureMode>('classic');
   const requestRef = useRef(0);
 
   const portrait = usePortraitViewport();
@@ -105,7 +101,7 @@ export default function App() {
           sourcePicker.advanceAfterSuccess();
           lastPickedStemRef.current = choice.stem;
         }
-        lastBuildRef.current = { mode: 'classic', choice, seed: varietySeed };
+        lastBuildRef.current = { choice, seed: varietySeed };
         setGenerationId((g) => g + 1);
         setPhase('revealing');
       } catch (e) {
@@ -117,57 +113,21 @@ export default function App() {
     [missingTiles, missingSources, sourcePicker, tiles],
   );
 
-  const runOriginal = useCallback(
-    async (seed: number) => {
-      if (missingTiles) return;
-      const requestId = ++requestRef.current;
-      setLiving(false);
-      setPhase('computing');
-      setCells([]);
-      const { gridW, gridH } = gridRef.current;
-      try {
-        const scene = paintFlowerScene(seed, gridW, gridH, familyMeans(tiles));
-        const built = buildMosaicFromScene(tiles, seed, scene);
-        if (requestId !== requestRef.current) return;
-        await preloadMosaicTileUrls(built);
-        if (requestId !== requestRef.current) return;
-        setCells(built);
-        lastBuildRef.current = { mode: 'original', seed };
-        setGenerationId((g) => g + 1);
-        setPhase('revealing');
-      } catch (e) {
-        if (requestId !== requestRef.current) return;
-        console.error(e);
-        setPhase('idle');
-      }
-    },
-    [missingTiles, tiles],
-  );
-
   const portraitRef = useRef(portrait);
   useEffect(() => {
     if (portraitRef.current === portrait) return;
     portraitRef.current = portrait;
     const last = lastBuildRef.current;
     if (!last) return;
-    if (last.mode === 'original') {
-      void runOriginal(last.seed);
-      return;
-    }
     void runBuild(last.choice, last.seed, false);
-  }, [portrait, runBuild, runOriginal]);
+  }, [portrait, runBuild]);
 
   const runGenerate = useCallback(async () => {
-    if (pictureMode === 'original') {
-      const seed = randomIntegerBelow(0x7fff_ffff + 1) || 1;
-      await runOriginal(seed);
-      return;
-    }
     if (missingTiles || missingSources) return;
     const choice = sourcePicker.peekNext(lastPickedStemRef.current);
     const varietySeed = randomIntegerBelow(0x7fff_ffff + 1);
     await runBuild(choice, varietySeed, true);
-  }, [missingSources, missingTiles, pictureMode, runBuild, runOriginal, sourcePicker]);
+  }, [missingSources, missingTiles, runBuild, sourcePicker]);
 
   const computeBusy = phase === 'computing';
   const artworkReady = phase === 'done';
@@ -221,8 +181,6 @@ export default function App() {
           artworkReady={artworkReady}
           missingTiles={missingTiles}
           missingSources={missingSources}
-          pictureMode={pictureMode}
-          onPictureMode={setPictureMode}
         />
 
         <main
@@ -252,11 +210,7 @@ export default function App() {
               canvasBg={CANVAS_BG}
               living={living}
               emptyLabel={
-                computeBusy
-                  ? 'Painting mosaic…'
-                  : pictureMode === 'original'
-                    ? 'Press generate to grow an original flower'
-                    : 'Press generate to create your artwork'
+                computeBusy ? 'Painting mosaic…' : 'Press generate to create your artwork'
               }
               handTileRipple={rippleOn}
               gridW={grid.gridW}

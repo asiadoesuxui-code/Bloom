@@ -1,6 +1,6 @@
 # Bloom
 
-Bloom builds a ceramic-tile mosaic. **Classic** rebuilds a photo from `src/sources`. **Original** grows a new flower scene from a random seed, with no photo upload. Either way the tiles come from `src/elements` (`shape_color.png`), arrive in a diagonal wave, then breathe. Move the mouse — or drag a finger on the mosaic — and a ripple runs through them. **Hand track** is optional and uses the camera.
+Bloom builds a ceramic-tile mosaic from a photo in `src/sources`. The tiles come from `src/elements` (`shape_color.png`), arrive in a diagonal wave, then breathe. Move the mouse — or drag a finger on the mosaic — and a ripple runs through them. **Hand track** is optional and uses the camera.
 
 On a portrait screen the mosaic fills the phone and cover-crops the photo. Landscape stays a 16:9 frame.
 
