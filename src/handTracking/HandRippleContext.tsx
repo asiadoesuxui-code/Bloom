@@ -296,11 +296,6 @@ export function HandRippleTileShell({ cx, cy, rippleActive, children }: ShellPro
     });
   }, [ctx, rippleActive, cx, cy, txMv, tyMv, sMv]);
 
-  if (!ctx?.enabled) return <>{children}</>;
-
-  /** Reveal phase: identical DOM depth as hand-tracking off (`revealRef` directly wraps the tile face). */
-  if (!rippleActive) return <>{children}</>;
-
   return (
     <motion.div
       style={{

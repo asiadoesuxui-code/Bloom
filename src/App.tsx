@@ -20,6 +20,37 @@ type SourceChoice = { url: string; stem: string };
 
 type LastBuild = { choice: SourceChoice; seed: number };
 
+function useVisualViewportBox() {
+  const read = () => {
+    const vv = window.visualViewport;
+    return {
+      width: vv?.width ?? window.innerWidth,
+      height: vv?.height ?? window.innerHeight,
+      offsetTop: vv?.offsetTop ?? 0,
+      offsetLeft: vv?.offsetLeft ?? 0,
+    };
+  };
+  const [box, setBox] = useState(() =>
+    typeof window === 'undefined'
+      ? { width: 1280, height: 800, offsetTop: 0, offsetLeft: 0 }
+      : read(),
+  );
+  useEffect(() => {
+    const update = () => setBox(read());
+    update();
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', update);
+    vv?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => {
+      vv?.removeEventListener('resize', update);
+      vv?.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+  return box;
+}
+
 function usePortraitViewport(): boolean {
   const [portrait, setPortrait] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(orientation: portrait)').matches : false,
@@ -43,6 +74,7 @@ export default function App() {
   const lastBuildRef = useRef<LastBuild | null>(null);
   const requestRef = useRef(0);
 
+  const viewport = useVisualViewportBox();
   const portrait = usePortraitViewport();
   const grid = gridSizeForPortrait(portrait);
   const gridRef = useRef(grid);
@@ -69,15 +101,34 @@ export default function App() {
     mapTargetRef: mosaicRef,
   });
 
+  const landedRef = useRef(0);
+  const settleRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     if (phase !== 'revealing') return;
+    landedRef.current = 0;
     setLiving(false);
-    const id = window.setTimeout(() => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
       setPhase('done');
       setLiving(true);
-    }, revealLivingHoldMs());
-    return () => window.clearTimeout(id);
+    };
+    settleRef.current = finish;
+    // Fallback if a reveal animation never reports that it landed.
+    const id = window.setTimeout(finish, revealLivingHoldMs());
+    return () => {
+      window.clearTimeout(id);
+      settleRef.current = () => {};
+    };
   }, [phase, generationId]);
+
+  const onTileLanded = useCallback(() => {
+    landedRef.current += 1;
+    const { gridW, gridH } = gridRef.current;
+    if (landedRef.current >= gridW * gridH) settleRef.current();
+  }, []);
 
   const runBuild = useCallback(
     async (choice: SourceChoice, varietySeed: number, advancePicker: boolean) => {
@@ -131,21 +182,12 @@ export default function App() {
 
   const computeBusy = phase === 'computing';
   const artworkReady = phase === 'done';
-
-  const landscapeFrame = {
+  const compact = portrait || viewport.height < 720;
+  const frameStyle = {
     position: 'relative' as const,
-    width: 'min(100%, calc((100svh - 200px) * 16 / 9))',
-    maxWidth: '100%',
-    aspectRatio: '16 / 9',
-    maxHeight: 'calc(100svh - 200px)',
-    borderRadius: 12,
-    boxSizing: 'border-box' as const,
-  };
-
-  const portraitFrame = {
-    position: 'relative' as const,
-    aspectRatio: '9 / 16',
-    width: 'min(100cqw, calc(100cqh * 9 / 16))',
+    aspectRatio: `${grid.gridW} / ${grid.gridH}`,
+    width: `min(100cqw, calc(100cqh * ${grid.gridW} / ${grid.gridH}))`,
+    height: `min(100cqh, calc(100cqw * ${grid.gridH} / ${grid.gridW}))`,
     maxWidth: '100%',
     maxHeight: '100%',
     borderRadius: 12,
@@ -164,35 +206,35 @@ export default function App() {
       <div
         data-portrait={portrait ? 'true' : 'false'}
         style={{
-          minHeight: '100svh',
-          height: portrait ? '100svh' : undefined,
-          overflow: portrait ? 'hidden' : undefined,
+          position: 'fixed',
+          top: viewport.offsetTop,
+          left: viewport.offsetLeft,
+          width: viewport.width,
+          height: viewport.height,
+          maxHeight: '100dvh',
+          overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
+          boxSizing: 'border-box',
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingRight: 'env(safe-area-inset-right)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          paddingLeft: 'env(safe-area-inset-left)',
           background:
             'radial-gradient(1200px 700px at 50% -10%, rgba(92, 108, 168, 0.22), transparent 55%), #07080b',
         }}
       >
-        <Chrome
-          portrait={portrait}
-          onGenerate={runGenerate}
-          computeBusy={computeBusy}
-          hasCells={hasCells}
-          artworkReady={artworkReady}
-          missingTiles={missingTiles}
-          missingSources={missingSources}
-        />
-
         <main
           style={{
-            flex: 1,
+            flex: '1 1 auto',
+            minHeight: 0,
+            minWidth: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: portrait ? '4px 10px 10px' : '8px 28px 12px',
-            minHeight: 0,
+            padding: compact ? 8 : 12,
             position: 'relative',
-            containerType: portrait ? 'size' : undefined,
+            containerType: 'size',
           }}
         >
           <HandTrackingToggle
@@ -201,7 +243,7 @@ export default function App() {
             permissionDenied={handRt.error === 'denied'}
           />
 
-          <div style={portrait ? portraitFrame : landscapeFrame}>
+          <div style={frameStyle}>
             {handTracking && hasCells ? <HandTrackingErrorBanner error={handRt.error} /> : null}
             <MosaicView
               ref={mosaicRef}
@@ -212,12 +254,22 @@ export default function App() {
               emptyLabel={
                 computeBusy ? 'Painting mosaic…' : 'Press generate to create your artwork'
               }
-              handTileRipple={rippleOn}
+              handTileRipple={hasCells}
               gridW={grid.gridW}
               gridH={grid.gridH}
+              onTileLanded={onTileLanded}
             />
           </div>
         </main>
+        <Chrome
+          compact={compact}
+          onGenerate={runGenerate}
+          computeBusy={computeBusy}
+          hasCells={hasCells}
+          artworkReady={artworkReady}
+          missingTiles={missingTiles}
+          missingSources={missingSources}
+        />
         {handPipelineOn ? (
           <video
             ref={handRt.videoRef as Ref<HTMLVideoElement>}
