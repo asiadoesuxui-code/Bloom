@@ -6,8 +6,9 @@ import { preloadMosaicTileUrls } from './lib/preloadMosaicTiles';
 import { loadResolvedTiles } from './lib/tileUrls';
 import { loadSourceAssets, createFairSourcePicker, randomIntegerBelow } from './lib/sources';
 import { gridSizeForPortrait } from './lib/waveOrder';
-import { useHandTrackingRuntime } from './handTracking/useHandTrackingRuntime';
+import { useHandTrackingRuntime, type HandCanvasNorm } from './handTracking/useHandTrackingRuntime';
 import { HandRippleProvider } from './handTracking/HandRippleContext';
+import { usePointerRipple } from './handTracking/usePointerRipple';
 import { HandTrackingToggle } from './handTracking/HandTrackingToggle';
 import { HandTrackingErrorBanner } from './handTracking/HandTrackingErrorBanner';
 
@@ -56,6 +57,10 @@ export default function App() {
 
   const hasCells = cells.length > 0;
   const handPipelineOn = hasCells && handTracking;
+  /** Ripple shells after the reveal, or sooner if hand tracking is already on. */
+  const rippleOn = hasCells && (living || handTracking);
+  const pointerCanvasNormRef = useRef<HandCanvasNorm | null>(null);
+  usePointerRipple(mosaicRef, pointerCanvasNormRef, rippleOn);
 
   const handRt = useHandTrackingRuntime({
     enabled: handPipelineOn,
@@ -147,10 +152,11 @@ export default function App() {
 
   return (
     <HandRippleProvider
-      enabled={handPipelineOn}
+      enabled={rippleOn}
       gridW={grid.gridW}
       gridH={grid.gridH}
       handCanvasNormRef={handRt.handCanvasNormRef}
+      pointerCanvasNormRef={pointerCanvasNormRef}
       mapTargetRef={mosaicRef}
     >
       <div
@@ -202,7 +208,7 @@ export default function App() {
               canvasBg={CANVAS_BG}
               living={living}
               emptyLabel={computeBusy ? 'Painting mosaic…' : 'Press generate to create your artwork'}
-              handTileRipple={handPipelineOn}
+              handTileRipple={rippleOn}
               gridW={grid.gridW}
               gridH={grid.gridH}
             />

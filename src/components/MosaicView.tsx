@@ -230,6 +230,9 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
         borderRadius: 10,
         overflow: 'hidden',
         boxShadow: '0 24px 80px rgba(0,0,0,0.45)',
+        touchAction: 'pinch-zoom',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
       }}
     >
       {hasTiles ? (

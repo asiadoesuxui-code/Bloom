@@ -55,6 +55,8 @@ type ProviderProps = {
   gridW: number;
   gridH: number;
   handCanvasNormRef: RefObject<HandCanvasNorm | null>;
+  /** Mouse or touch, in the same 0–1 mosaic space as the hand. Used when no hand is present. */
+  pointerCanvasNormRef: RefObject<HandCanvasNorm | null>;
   mapTargetRef: RefObject<HTMLElement | null>;
   children: ReactNode;
 };
@@ -64,6 +66,7 @@ export function HandRippleProvider({
   gridW,
   gridH,
   handCanvasNormRef,
+  pointerCanvasNormRef,
   mapTargetRef,
   children,
 }: ProviderProps) {
@@ -97,7 +100,7 @@ export function HandRippleProvider({
 
     const tick = () => {
       const rect = mapTargetRef.current?.getBoundingClientRect();
-      const hand = handCanvasNormRef.current;
+      const hand = handCanvasNormRef.current ?? pointerCanvasNormRef.current;
       const reg = registry.current;
 
       if (!rect || rect.width < 2 || rect.height < 2) {
@@ -254,7 +257,7 @@ export function HandRippleProvider({
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [enabled, gridW, gridH, handCanvasNormRef, mapTargetRef]);
+  }, [enabled, gridW, gridH, handCanvasNormRef, pointerCanvasNormRef, mapTargetRef]);
 
   const value = useMemo<HandRippleInner>(
     () => ({
