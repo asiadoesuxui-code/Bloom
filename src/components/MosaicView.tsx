@@ -11,7 +11,6 @@ import {
 import { getLivingMotionParams } from '../animations/tileLiving';
 import { revealGsParamsFromSeed, revealMicroFromSeed } from '../animations/tileReveal';
 import type { MosaicCell } from '../lib/mosaic';
-import { GRID_H, GRID_W } from '../lib/waveOrder';
 import { HandRippleTileShell, tileFlatIndex, useHandRippleRegister } from '../handTracking/HandRippleContext';
 
 export type MosaicViewProps = {
@@ -22,12 +21,16 @@ export type MosaicViewProps = {
   emptyLabel: string;
   /** Wrap tiles with hand ripple shell (expects HandRippleProvider above) */
   handTileRipple?: boolean;
+  gridW: number;
+  gridH: number;
 };
 
 type TileProps = {
   cell: MosaicCell;
   living: boolean;
   rippleShell: boolean;
+  gridW: number;
+  gridH: number;
 };
 
 const LIVING_LAYER: CSSProperties = {
@@ -38,7 +41,7 @@ const LIVING_LAYER: CSSProperties = {
   borderRadius: 2,
 };
 
-const BloomTile = memo(function BloomTile({ cell, living, rippleShell }: TileProps) {
+const BloomTile = memo(function BloomTile({ cell, living, rippleShell, gridW, gridH }: TileProps) {
   const { cx, cy, url, delaySec, seed } = cell;
   const livingOn = living;
   const livingParams = useMemo(() => getLivingMotionParams(seed), [seed]);
@@ -93,7 +96,7 @@ const BloomTile = memo(function BloomTile({ cell, living, rippleShell }: TilePro
     );
 
     const dampenBuf = handRipple?.livingDampen;
-    const dIdx = tileFlatIndex(cx, cy);
+    const dIdx = tileFlatIndex(cx, cy, gridW);
     let tickBlend: (() => void) | undefined;
     if (dampenBuf) {
       tickBlend = () => {
@@ -108,7 +111,7 @@ const BloomTile = memo(function BloomTile({ cell, living, rippleShell }: TilePro
       tw.kill();
       reset();
     };
-  }, [livingOn, seed, livingParams, cx, cy, handRipple?.livingDampen]);
+  }, [livingOn, seed, livingParams, cx, cy, gridW, handRipple?.livingDampen]);
 
   const livingLayer = (
     <div ref={livingScaleRef} style={LIVING_LAYER}>
@@ -131,10 +134,10 @@ const BloomTile = memo(function BloomTile({ cell, living, rippleShell }: TilePro
     <div
       style={{
         position: 'absolute',
-        left: `${(cx * 100) / GRID_W}%`,
-        top: `${(cy * 100) / GRID_H}%`,
-        width: `${100 / GRID_W}%`,
-        height: `${100 / GRID_H}%`,
+        left: `${(cx * 100) / gridW}%`,
+        top: `${(cy * 100) / gridH}%`,
+        width: `${100 / gridW}%`,
+        height: `${100 / gridH}%`,
         overflow: popsAboveGrid ? 'visible' : 'hidden',
         zIndex: popsAboveGrid ? 4 + (seed & 31) : undefined,
       }}
@@ -201,6 +204,8 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
     living,
     emptyLabel,
     handTileRipple = false,
+    gridW,
+    gridH,
   },
   ref,
 ) {
@@ -247,6 +252,8 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
               cell={cell}
               living={living}
               rippleShell={handTileRipple}
+              gridW={gridW}
+              gridH={gridH}
             />
           ))}
         </div>

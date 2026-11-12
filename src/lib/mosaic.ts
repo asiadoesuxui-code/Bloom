@@ -13,6 +13,15 @@ import {
 } from './sourceColorClassify';
 import { GRID_H, GRID_W, waveRankMap } from './waveOrder';
 
+export type MosaicFit = 'stretch' | 'cover';
+
+export type MosaicBuildOptions = {
+  gridW?: number;
+  gridH?: number;
+  /** `stretch` maps the whole photo (landscape, unchanged). `cover` center-crops to the grid. */
+  fit?: MosaicFit;
+};
+
 export const REVEAL_TOTAL_MS = 5000;
 
 /**
@@ -245,6 +254,23 @@ function pickTileForPixel(
   return sorted[shapeIdx]!;
 }
 
+type SampleRegion = { x: number; y: number; w: number; h: number };
+
+/** Full frame, or a center cover-crop whose aspect matches the grid. */
+function sampleRegion(srcW: number, srcH: number, gridW: number, gridH: number, fit: MosaicFit): SampleRegion {
+  if (fit !== 'cover' || srcW <= 0 || srcH <= 0 || gridW <= 0 || gridH <= 0) {
+    return { x: 0, y: 0, w: srcW, h: srcH };
+  }
+  const srcAspect = srcW / srcH;
+  const gridAspect = gridW / gridH;
+  if (srcAspect > gridAspect) {
+    const w = srcH * gridAspect;
+    return { x: (srcW - w) / 2, y: 0, w, h: srcH };
+  }
+  const h = srcW / gridAspect;
+  return { x: 0, y: (srcH - h) / 2, w: srcW, h };
+}
+
 function averageColorForCell(
   data: Uint8ClampedArray,
   stride: number,
@@ -252,11 +278,20 @@ function averageColorForCell(
   srcH: number,
   cx: number,
   cy: number,
+  gridW: number,
+  gridH: number,
+  region: SampleRegion,
 ): [number, number, number] {
-  const x0 = Math.floor((cx * srcW) / GRID_W);
-  const x1 = Math.floor(((cx + 1) * srcW) / GRID_W);
-  const y0 = Math.floor((cy * srcH) / GRID_H);
-  const y1 = Math.floor(((cy + 1) * srcH) / GRID_H);
+  let x0 = Math.floor(region.x + (cx * region.w) / gridW);
+  let x1 = Math.floor(region.x + ((cx + 1) * region.w) / gridW);
+  let y0 = Math.floor(region.y + (cy * region.h) / gridH);
+  let y1 = Math.floor(region.y + ((cy + 1) * region.h) / gridH);
+  if (x0 < 0) x0 = 0;
+  if (y0 < 0) y0 = 0;
+  if (x1 > srcW) x1 = srcW;
+  if (y1 > srcH) y1 = srcH;
+  if (x1 <= x0 && x0 < srcW) x1 = x0 + 1;
+  if (y1 <= y0 && y0 < srcH) y1 = y0 + 1;
 
   let r = 0,
     g = 0,
@@ -296,6 +331,7 @@ export async function buildMosaicFromImageUrl(
   varietySeed: number,
   /** Filename stem (e.g. `sunflower`) for optional palette hints — does not force colors. */
   sourceStem?: string,
+  options?: MosaicBuildOptions,
 ): Promise<MosaicCell[]> {
   const img = await loadImage(imageUrl);
   const canvas = document.createElement('canvas');
@@ -306,12 +342,15 @@ export async function buildMosaicFromImageUrl(
   ctx.drawImage(img, 0, 0);
   const { data, width: srcW, height: srcH } = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const stride = 4;
+  const gridW = options?.gridW ?? GRID_W;
+  const gridH = options?.gridH ?? GRID_H;
+  const region = sampleRegion(srcW, srcH, gridW, gridH, options?.fit ?? 'stretch');
 
   const meta = buildTileMeta(tilesWithLab(tiles));
   const buckets = bucketTilesByColor(meta);
 
-  const ranks = waveRankMap();
-  const totalCells = GRID_W * GRID_H;
+  const ranks = waveRankMap(gridW, gridH);
+  const totalCells = gridW * gridH;
   const maxRank = Math.max(1, totalCells - 1);
   const staggerSpanSec = REVEAL_TOTAL_MS / 1000 - REVEAL_TILE_DURATION_SEC;
   const chaosMaxSec = staggerSpanSec * REVEAL_CHAOS_FRAC;
@@ -321,9 +360,9 @@ export async function buildMosaicFromImageUrl(
   const cells: MosaicCell[] = [];
   let processed = 0;
 
-  for (let cy = 0; cy < GRID_H; cy++) {
-    for (let cx = 0; cx < GRID_W; cx++) {
-      const [r, g, b] = averageColorForCell(data, stride, srcW, srcH, cx, cy);
+  for (let cy = 0; cy < gridH; cy++) {
+    for (let cx = 0; cx < gridW; cx++) {
+      const [r, g, b] = averageColorForCell(data, stride, srcW, srcH, cx, cy, gridW, gridH, region);
       const choice = pickTileForPixel(r, g, b, cx, cy, buckets, varietySeed, sourceStem);
       if (!choice) {
         throw new Error('No tiles available for mosaic');

@@ -5,6 +5,7 @@ import { buildMosaicFromImageUrl, revealLivingHoldMs, type MosaicCell } from './
 import { preloadMosaicTileUrls } from './lib/preloadMosaicTiles';
 import { loadResolvedTiles } from './lib/tileUrls';
 import { loadSourceAssets, createFairSourcePicker, randomIntegerBelow } from './lib/sources';
+import { gridSizeForPortrait } from './lib/waveOrder';
 import { useHandTrackingRuntime } from './handTracking/useHandTrackingRuntime';
 import { HandRippleProvider } from './handTracking/HandRippleContext';
 import { HandTrackingToggle } from './handTracking/HandTrackingToggle';
@@ -14,12 +15,35 @@ const CANVAS_BG = '#0e0f12';
 
 type Phase = 'idle' | 'computing' | 'revealing' | 'done';
 
+type SourceChoice = { url: string; stem: string };
+
+function usePortraitViewport(): boolean {
+  const [portrait, setPortrait] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(orientation: portrait)').matches : false,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(orientation: portrait)');
+    const onChange = () => setPortrait(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return portrait;
+}
+
 export default function App() {
   const mosaicRef = useRef<HTMLDivElement>(null);
   const tiles = useMemo(() => loadResolvedTiles(), []);
   const sourceAssets = useMemo(() => loadSourceAssets(), []);
   const sourcePicker = useMemo(() => createFairSourcePicker(sourceAssets), [sourceAssets]);
   const lastPickedStemRef = useRef<string | null>(null);
+  const lastBuildRef = useRef<{ choice: SourceChoice; seed: number } | null>(null);
+  const requestRef = useRef(0);
+
+  const portrait = usePortraitViewport();
+  const grid = gridSizeForPortrait(portrait);
+  const gridRef = useRef(grid);
+  gridRef.current = grid;
 
   const [generationId, setGenerationId] = useState(0);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -48,39 +72,93 @@ export default function App() {
     return () => window.clearTimeout(id);
   }, [phase, generationId]);
 
+  const runBuild = useCallback(
+    async (choice: SourceChoice, varietySeed: number, advancePicker: boolean) => {
+      if (missingTiles || missingSources) return;
+      const requestId = ++requestRef.current;
+      setLiving(false);
+      setPhase('computing');
+      setCells([]);
+      const { gridW, gridH } = gridRef.current;
+      try {
+        const built = await buildMosaicFromImageUrl(choice.url, tiles, varietySeed, choice.stem, {
+          gridW,
+          gridH,
+          fit: gridH > gridW ? 'cover' : 'stretch',
+        });
+        if (requestId !== requestRef.current) return;
+        await preloadMosaicTileUrls(built);
+        if (requestId !== requestRef.current) return;
+        setCells(built);
+        if (advancePicker) {
+          sourcePicker.advanceAfterSuccess();
+          lastPickedStemRef.current = choice.stem;
+        }
+        lastBuildRef.current = { choice, seed: varietySeed };
+        setGenerationId((g) => g + 1);
+        setPhase('revealing');
+      } catch (e) {
+        if (requestId !== requestRef.current) return;
+        console.error(e);
+        setPhase('idle');
+      }
+    },
+    [missingTiles, missingSources, sourcePicker, tiles],
+  );
+
+  const portraitRef = useRef(portrait);
+  useEffect(() => {
+    if (portraitRef.current === portrait) return;
+    portraitRef.current = portrait;
+    const last = lastBuildRef.current;
+    if (!last) return;
+    void runBuild(last.choice, last.seed, false);
+  }, [portrait, runBuild]);
+
   const runGenerate = useCallback(async () => {
     if (missingTiles || missingSources) return;
-    setLiving(false);
-    setPhase('computing');
-    setCells([]);
     const choice = sourcePicker.peekNext(lastPickedStemRef.current);
-    try {
-      const varietySeed = randomIntegerBelow(0x7fff_ffff + 1);
-      const built = await buildMosaicFromImageUrl(choice.url, tiles, varietySeed, choice.stem);
-      await preloadMosaicTileUrls(built);
-      setCells(built);
-      sourcePicker.advanceAfterSuccess();
-      lastPickedStemRef.current = choice.stem;
-      setGenerationId((g) => g + 1);
-      setPhase('revealing');
-    } catch (e) {
-      console.error(e);
-      setPhase('idle');
-    }
-  }, [missingTiles, missingSources, sourcePicker, tiles]);
+    const varietySeed = randomIntegerBelow(0x7fff_ffff + 1);
+    await runBuild(choice, varietySeed, true);
+  }, [missingSources, missingTiles, runBuild, sourcePicker]);
 
   const computeBusy = phase === 'computing';
   const artworkReady = phase === 'done';
 
+  const landscapeFrame = {
+    position: 'relative' as const,
+    width: 'min(100%, calc((100svh - 200px) * 16 / 9))',
+    maxWidth: '100%',
+    aspectRatio: '16 / 9',
+    maxHeight: 'calc(100svh - 200px)',
+    borderRadius: 12,
+    boxSizing: 'border-box' as const,
+  };
+
+  const portraitFrame = {
+    position: 'relative' as const,
+    aspectRatio: '9 / 16',
+    width: 'min(100cqw, calc(100cqh * 9 / 16))',
+    maxWidth: '100%',
+    maxHeight: '100%',
+    borderRadius: 12,
+    boxSizing: 'border-box' as const,
+  };
+
   return (
     <HandRippleProvider
       enabled={handPipelineOn}
+      gridW={grid.gridW}
+      gridH={grid.gridH}
       handCanvasNormRef={handRt.handCanvasNormRef}
       mapTargetRef={mosaicRef}
     >
       <div
+        data-portrait={portrait ? 'true' : 'false'}
         style={{
           minHeight: '100svh',
+          height: portrait ? '100svh' : undefined,
+          overflow: portrait ? 'hidden' : undefined,
           display: 'flex',
           flexDirection: 'column',
           background:
@@ -88,6 +166,7 @@ export default function App() {
         }}
       >
         <Chrome
+          portrait={portrait}
           onGenerate={runGenerate}
           computeBusy={computeBusy}
           hasCells={hasCells}
@@ -102,9 +181,10 @@ export default function App() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '8px 28px 12px',
+            padding: portrait ? '4px 10px 10px' : '8px 28px 12px',
             minHeight: 0,
             position: 'relative',
+            containerType: portrait ? 'size' : undefined,
           }}
         >
           <HandTrackingToggle
@@ -113,17 +193,7 @@ export default function App() {
             permissionDenied={handRt.error === 'denied'}
           />
 
-          <div
-            style={{
-              position: 'relative',
-              width: 'min(100%, calc((100svh - 200px) * 16 / 9))',
-              maxWidth: '100%',
-              aspectRatio: '16 / 9',
-              maxHeight: 'calc(100svh - 200px)',
-              borderRadius: 12,
-              boxSizing: 'border-box',
-            }}
-          >
+          <div style={portrait ? portraitFrame : landscapeFrame}>
             {handTracking && hasCells ? <HandTrackingErrorBanner error={handRt.error} /> : null}
             <MosaicView
               ref={mosaicRef}
@@ -133,6 +203,8 @@ export default function App() {
               living={living}
               emptyLabel={computeBusy ? 'Painting mosaic…' : 'Press generate to create your artwork'}
               handTileRipple={handPipelineOn}
+              gridW={grid.gridW}
+              gridH={grid.gridH}
             />
           </div>
         </main>

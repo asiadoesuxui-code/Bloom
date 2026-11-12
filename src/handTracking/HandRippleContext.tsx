@@ -9,12 +9,11 @@ import {
   type RefObject,
 } from 'react';
 import { motionValue, type MotionValue, motion } from 'framer-motion';
-import { GRID_H, GRID_W } from '../lib/waveOrder';
 import { rippleDisplacementPx, rippleInfluenceReachPx } from './handRippleMath';
 import type { HandCanvasNorm } from './useHandTrackingRuntime';
 
-export function tileFlatIndex(cx: number, cy: number): number {
-  return cy * GRID_W + cx;
+export function tileFlatIndex(cx: number, cy: number, gridW: number): number {
+  return cy * gridW + cx;
 }
 
 type MotionRegs = {
@@ -53,6 +52,8 @@ export function useHandRippleRegister(): HandRippleInner | null {
 
 type ProviderProps = {
   enabled: boolean;
+  gridW: number;
+  gridH: number;
   handCanvasNormRef: RefObject<HandCanvasNorm | null>;
   mapTargetRef: RefObject<HTMLElement | null>;
   children: ReactNode;
@@ -60,12 +61,17 @@ type ProviderProps = {
 
 export function HandRippleProvider({
   enabled,
+  gridW,
+  gridH,
   handCanvasNormRef,
   mapTargetRef,
   children,
 }: ProviderProps) {
   const registry = useRef(new Map<string, Entry>());
-  const dampen = useRef(new Float32Array(GRID_W * GRID_H));
+  const dampen = useRef(new Float32Array(gridW * gridH));
+  if (dampen.current.length !== gridW * gridH) {
+    dampen.current = new Float32Array(gridW * gridH);
+  }
 
   const register = useCallback((cx: number, cy: number, mvs: MotionRegs) => {
     const key = `${cx},${cy}`;
@@ -153,8 +159,8 @@ export function HandRippleProvider({
       const reachPx = rippleInfluenceReachPx(w, h);
       /** Extra halo so retarded-wave tiles at the ROI rim still animate; width capped vs grid size. */
       const marginPx = reachPx + minDim * 0.072;
-      const cellWpx = w / GRID_W;
-      const cellHpx = h / GRID_H;
+      const cellWpx = w / gridW;
+      const cellHpx = h / gridH;
       const cellMin = Math.min(cellWpx, cellHpx);
       const tcx = hand ? (hand.x * w) / cellWpx - 0.5 : 0;
       const tcy = hand ? (hand.y * h) / cellHpx - 0.5 : 0;
@@ -162,12 +168,12 @@ export function HandRippleProvider({
       const radialCells = Math.ceil(marginPx / cellMin) + 2;
       /** Must cover displacement falloff (~`minDim * 0.392`), else rings clip at ROI edge. Still hard-capped for perf. */
       const waveBandCells = Math.ceil((minDim * 0.392) / cellMin) + 3;
-      const mCells = clampScalar(Math.min(radialCells, Math.max(waveBandCells, 10), 20), 3, Math.max(GRID_W, GRID_H));
+      const mCells = clampScalar(Math.min(radialCells, Math.max(waveBandCells, 10), 20), 3, Math.max(gridW, gridH));
 
-      const fsx = clampScalar(Math.floor(tcx - mCells), 0, GRID_W - 1);
-      const fex = clampScalar(Math.ceil(tcx + mCells), 0, GRID_W - 1);
-      const fsy = clampScalar(Math.floor(tcy - mCells), 0, GRID_H - 1);
-      const fey = clampScalar(Math.ceil(tcy + mCells), 0, GRID_H - 1);
+      const fsx = clampScalar(Math.floor(tcx - mCells), 0, gridW - 1);
+      const fex = clampScalar(Math.ceil(tcx + mCells), 0, gridW - 1);
+      const fsy = clampScalar(Math.floor(tcy - mCells), 0, gridH - 1);
+      const fey = clampScalar(Math.ceil(tcy + mCells), 0, gridH - 1);
 
       const work = workSetRef.current;
       work.clear();
@@ -175,7 +181,7 @@ export function HandRippleProvider({
       if (hand) {
         for (let cy = fsy; cy <= fey; cy++) {
           for (let cx = fsx; cx <= fex; cx++) {
-            work.add(tileFlatIndex(cx, cy));
+            work.add(tileFlatIndex(cx, cy, gridW));
           }
         }
       }
@@ -189,13 +195,13 @@ export function HandRippleProvider({
       const baseHy = hand ? hand.y * h : -99999;
 
       for (const id of work) {
-        const cx = id % GRID_W;
-        const cy = Math.floor(id / GRID_W);
+        const cx = id % gridW;
+        const cy = Math.floor(id / gridW);
         const e = reg.get(`${cx},${cy}`);
         if (!e) continue;
 
-        const tpx = ((cx + 0.5) / GRID_W) * w;
-        const tpy = ((cy + 0.5) / GRID_H) * h;
+        const tpx = ((cx + 0.5) / gridW) * w;
+        const tpy = ((cy + 0.5) / gridH) * h;
 
         let dx = 0;
         let dy = 0;
@@ -248,7 +254,7 @@ export function HandRippleProvider({
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [enabled, handCanvasNormRef, mapTargetRef]);
+  }, [enabled, gridW, gridH, handCanvasNormRef, mapTargetRef]);
 
   const value = useMemo<HandRippleInner>(
     () => ({
@@ -256,7 +262,7 @@ export function HandRippleProvider({
       register,
       livingDampen: enabled ? dampen.current : null,
     }),
-    [enabled, register],
+    [enabled, register, gridW, gridH],
   );
 
   return <HandRippleCtx.Provider value={value}>{children}</HandRippleCtx.Provider>;
