@@ -53,35 +53,37 @@ export function isTrueScarletSample(r: number, g: number, b: number): boolean {
   return true;
 }
 
-/** Lily pads: a clear green cast, bluer water excluded. */
-export function isLilyPadSample(r: number, g: number, b: number): boolean {
-  const greenExcess = g - 0.5 * (r + b);
-  return greenExcess >= 12 && g > b + 18;
+/**
+ * Soil, seed centres, and branches: warm, but red stays close to green.
+ * A saturated red, pink, or orange fails this.
+ */
+export function isGenuineBrownSample(r: number, g: number, b: number): boolean {
+  const spread = Math.max(r, g, b) - Math.min(r, g, b);
+  if (spread < 10 || spread > 72) return false;
+  if (r < 36 || g < 24) return false;
+  if (b > g + 6) return false;
+  if (g > r + 12) return false;
+  if (r > g + 32) return false;
+  return r > b + 8;
 }
 
 /**
- * Lily water is the dark, non-floral ground that is not a pad.
- * It is often brown-green from reflections, so colour distance alone paints it as foliage.
+ * A red that is too dark or too shaded for `poppy`, but still red.
+ * Pink, gold, and genuine brown stay out.
  */
-export function isLilyWaterSample(r: number, g: number, b: number): boolean {
-  if (isPinkOrMagentaSample(r, g, b)) return false;
-  if (isLightNeutralSample(r, g, b)) return false;
-  if (isTrueScarletSample(r, g, b)) return false;
-  if (isLilyPadSample(r, g, b)) return false;
+export function isShadedRedSample(r: number, g: number, b: number): boolean {
+  if (isPinkOrMagentaSample(r, g, b) || isGenuineBrownSample(r, g, b)) return false;
+  if (g > 88 && g > r * 0.58) return false;
+  if (r < 48 || r < g + 28 || r < b + 18) return false;
+  if (b > g + 12) return false;
   return true;
 }
 
-/** Blues plus teal. Lily water is limited to these. */
-export function isLilyWaterCeramicFamily(colorKey: string): boolean {
-  switch (colorKey.toLowerCase()) {
-    case 'lightblue':
-    case 'midblue':
-    case 'darkblue':
-    case 'seagreen':
-      return true;
-    default:
-      return false;
-  }
+/** Red, pink, and orange hues. Brown ceramics are the wrong family for these. */
+export function isRedPinkOrOrangeHue(r: number, g: number, b: number): boolean {
+  if (isGenuineBrownSample(r, g, b)) return false;
+  if (isPinkOrMagentaSample(r, g, b) || isTrueScarletSample(r, g, b) || isShadedRedSample(r, g, b)) return true;
+  return r > 80 && r > g + 8 && g > b + 12 && r > b + 28 && g > 40;
 }
 
 /** Foliage ceramics. `forest` belongs with `green`, `lightgreen`, and `seagreen`. */

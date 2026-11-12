@@ -6,12 +6,12 @@ import {
   isBlueCeramicFamily,
   isBrownCeramicFamily,
   isDarkForestSample,
+  isGreenLeaningSample,
   isLeafyGreenCeramicFamily,
   isLightNeutralCeramicFamily,
   isLightNeutralSample,
-  isLilyWaterCeramicFamily,
-  isLilyWaterSample,
-  isScarletCeramicFamily,
+  isRedPinkOrOrangeHue,
+  isShadedRedSample,
   isTrueScarletSample,
   shouldSuppressConflictingEarthTones,
   isBrightGoldenFlowerSample,
@@ -171,16 +171,6 @@ function eligibleColorKeys(
   }
 
   /**
-   * `poppy` and `red` are scarlet ceramics. Pink and magenta stay on `pink` / `blush`.
-   * Sunflower gold also fails this, which keeps the old sunflower red gate.
-   */
-  if (!isTrueScarletSample(r, g, b)) {
-    for (const k of [...keys]) {
-      if (isScarletCeramicFamily(k)) keys.delete(k);
-    }
-  }
-
-  /**
    * Sunflower.png: warm petals satisfy `isWarmBrownOrangeSample`, which turns OFF global blue/brown
    * suppression on foliage rules — so blues can win on luminance. Drop them unless the cell is blue.
    */
@@ -224,27 +214,30 @@ function eligibleColorKeys(
     }
   }
 
-  /**
-   * Lily water reads as dark olive because of reflected pads. Force it onto
-   * blue / teal ceramics. Pads stay on the green path above.
-   */
-  if (stem === 'lily' && isLilyWaterSample(r, g, b)) {
-    const water = new Set(all.filter((k) => isLilyWaterCeramicFamily(k)));
-    if (water.size > 0) return water;
+  // Sunflower seeds stay brown. Everywhere else, a shaded red or pink keeps that hue.
+  const seedCentre = stem === 'sunflower' && isSunflowerSeedCentreSample(r, g, b);
+  if (seedCentre) {
+    keys.delete('poppy');
+    keys.delete('red');
+    keys.add('brown');
+  } else {
+    if (!isTrueScarletSample(r, g, b)) keys.delete('poppy');
+    if (!isTrueScarletSample(r, g, b) && !isShadedRedSample(r, g, b)) keys.delete('red');
+    if (isRedPinkOrOrangeHue(r, g, b)) keys.delete('brown');
   }
 
-  if (keys.size === 0) {
-    const fallback = new Set(all);
-    if (!isTrueScarletSample(r, g, b)) {
-      for (const k of [...fallback]) {
-        if (isScarletCeramicFamily(k)) fallback.delete(k);
-      }
-    }
-    if (!isDarkForestSample(r, g, b)) fallback.delete('forest');
-    if (fallback.size > 0) return fallback;
-    return new Set(all);
-  }
+  if (keys.size === 0) return fallbackFamilies(all, r, g, b);
   return keys;
+}
+
+function fallbackFamilies(all: string[], r: number, g: number, b: number): Set<string> {
+  const fallback = new Set(all);
+  if (!isTrueScarletSample(r, g, b)) fallback.delete('poppy');
+  if (!isTrueScarletSample(r, g, b) && !isShadedRedSample(r, g, b)) fallback.delete('red');
+  if (isRedPinkOrOrangeHue(r, g, b)) fallback.delete('brown');
+  if (!isDarkForestSample(r, g, b)) fallback.delete('forest');
+  if (fallback.size > 0) return fallback;
+  return new Set(all);
 }
 
 function pickTileForPixel(
@@ -287,8 +280,11 @@ function pickTileForPixel(
   famDists.sort((a, b) => a.d2 - b.d2);
   const bestD2 = famDists[0]!.d2;
   let hi = 0;
-  while (hi + 1 < famDists.length && famDists[hi + 1]!.d2 <= bestD2 + FAMILY_DISTANCE_TIE_OKLAB2) {
-    hi++;
+  // A painted scene already chose its family. Photo cells may still tie nearby families.
+  if (!restrictKeys) {
+    while (hi + 1 < famDists.length && famDists[hi + 1]!.d2 <= bestD2 + FAMILY_DISTANCE_TIE_OKLAB2) {
+      hi++;
+    }
   }
   const tied = famDists.slice(0, hi + 1);
   const pickFamIdx = mosaicSpatialSlot(cx, cy, '*fam*', seed) % tied.length;
@@ -319,6 +315,53 @@ function sampleRegion(srcW: number, srcH: number, gridW: number, gridH: number, 
   }
   const h = srcW / gridAspect;
   return { x: 0, y: (srcH - h) / 2, w: srcW, h };
+}
+
+function channelDistance(a: readonly number[], b: readonly number[]): number {
+  return Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
+}
+
+function isStemCandidate(
+  samples: ReadonlyArray<readonly [number, number, number]>,
+  cx: number,
+  cy: number,
+  gridW: number,
+  gridH: number,
+): boolean {
+  if (cx <= 0 || cy < 0 || cx + 1 >= gridW || cy >= gridH) return false;
+  const here = samples[cy * gridW + cx]!;
+  if (!isGreenLeaningSample(here[0], here[1], here[2])) return false;
+  const left = samples[cy * gridW + (cx - 1)]!;
+  const right = samples[cy * gridW + (cx + 1)]!;
+  // A stem is the odd column: both sides differ from it, and the sides agree with each other.
+  if (channelDistance(here, left) < 30 || channelDistance(here, right) < 30) return false;
+  if (channelDistance(left, right) > 26) return false;
+  return true;
+}
+
+/**
+ * A vertical run of stem-like cells, at least three tall.
+ * The family contrasts with the flanks so the line does not flatten into the field.
+ * Isolated grass texture is left alone.
+ */
+function contrastingStemFamily(
+  samples: ReadonlyArray<readonly [number, number, number]>,
+  cx: number,
+  cy: number,
+  gridW: number,
+  gridH: number,
+): string | null {
+  if (!isStemCandidate(samples, cx, cy, gridW, gridH)) return null;
+  let run = 1;
+  for (let y = cy - 1; y >= 0 && isStemCandidate(samples, cx, y, gridW, gridH); y -= 1) run += 1;
+  for (let y = cy + 1; y < gridH && isStemCandidate(samples, cx, y, gridW, gridH); y += 1) run += 1;
+  if (run < 3) return null;
+  const left = samples[cy * gridW + (cx - 1)]!;
+  const right = samples[cy * gridW + (cx + 1)]!;
+  const flank = (left[0] + left[1] + left[2] + right[0] + right[1] + right[2]) / 2;
+  if (flank < 220) return 'lightgreen';
+  if (flank > 340) return 'forest';
+  return 'seagreen';
 }
 
 function averageColorForCell(
@@ -477,13 +520,24 @@ export async function buildMosaicFromImageUrl(
   const rippleMaxSec = staggerSpanSec * REVEAL_RIPPLE_FRAC;
   const ripplePhiRad = ripplePhaseRad(varietySeed);
 
+  const samples: Array<[number, number, number]> = new Array(totalCells);
+  for (let cy = 0; cy < gridH; cy++) {
+    for (let cx = 0; cx < gridW; cx++) {
+      samples[cy * gridW + cx] = averageColorForCell(data, stride, srcW, srcH, cx, cy, gridW, gridH, region);
+    }
+    if (cy % 4 === 3) await yieldToMain();
+  }
+
   const cells: MosaicCell[] = [];
   let processed = 0;
 
   for (let cy = 0; cy < gridH; cy++) {
     for (let cx = 0; cx < gridW; cx++) {
-      const [r, g, b] = averageColorForCell(data, stride, srcW, srcH, cx, cy, gridW, gridH, region);
-      const choice = pickTileForPixel(r, g, b, cx, cy, buckets, varietySeed, sourceStem);
+      const [r, g, b] = samples[cy * gridW + cx]!;
+      const stemKey = contrastingStemFamily(samples, cx, cy, gridW, gridH);
+      const choice = stemKey
+        ? pickTileForPixel(r, g, b, cx, cy, buckets, varietySeed, sourceStem, new Set([stemKey]))
+        : pickTileForPixel(r, g, b, cx, cy, buckets, varietySeed, sourceStem);
       if (!choice) {
         throw new Error('No tiles available for mosaic');
       }
