@@ -45,54 +45,16 @@ button {
   min-height: 100dvh;
 }
 
-/*
-  One element per tile. No will-change: promoting all 2040 tiles at once
-  drops the page to a few frames per second. The browser promotes a tile
-  only while it is actually animating.
-*/
-[data-bloom-reveal] {
-  opacity: 0;
-}
-
-[data-bloom-reveal][data-landed] {
-  opacity: 1;
-}
-
+/* Mosaic reveal — one compositor animation per tile (opacity + transform share timing). */
 @keyframes bloomTileReveal {
-  0% {
+  from {
     opacity: 0;
-    transform: translate3d(0, -8px, 0) scale(1.15);
+    transform: translate3d(0, calc(var(--bloom-reveal-y-pct, 0) * 1%), 0)
+      rotate(calc(var(--bloom-reveal-r-deg, 0) * 1deg)) scale3d(0.92, 0.92, 1);
   }
-  70% {
-    opacity: 1;
-    transform: translate3d(0, 1px, 0) scale(0.975);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
 
-@keyframes bloomBreathe {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(0, 0, 0) scale(var(--bloom-peak, 1.08));
-  }
-}
-
-@keyframes bloomSheen {
-  0% {
-    opacity: 0;
-    transform: translate3d(-130%, 0, 0);
-  }
-  18% {
+  to {
     opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(130%, 0, 0);
+    transform: translate3d(0, 0, 0) rotate(0deg) scale3d(1, 1, 1);
   }
 }

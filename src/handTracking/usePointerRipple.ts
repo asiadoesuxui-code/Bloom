@@ -1,5 +1,4 @@
 import { useEffect, type MutableRefObject, type RefObject } from 'react';
-import type { ShockPulse } from './HandRippleContext';
 import type { HandCanvasNorm } from './useHandTrackingRuntime';
 
 /**
@@ -10,7 +9,6 @@ export function usePointerRipple(
   targetRef: RefObject<HTMLElement | null>,
   pointerRef: MutableRefObject<HandCanvasNorm | null>,
   enabled: boolean,
-  shockRef?: MutableRefObject<ShockPulse | null>,
 ): void {
   useEffect(() => {
     const el = targetRef.current;
@@ -19,8 +17,6 @@ export function usePointerRipple(
       return;
     }
 
-    const trail: { x: number; y: number; t: number }[] = [];
-    let lastShock = 0;
     const write = (clientX: number, clientY: number) => {
       const rect = el.getBoundingClientRect();
       if (rect.width < 2 || rect.height < 2) return;
@@ -31,18 +27,6 @@ export function usePointerRipple(
         return;
       }
       pointerRef.current = { x, y };
-      const now = performance.now();
-      trail.push({ x, y, t: now });
-      while (trail.length && now - trail[0]!.t > 110) trail.shift();
-      const first = trail[0];
-      if (!first || trail.length < 2 || !shockRef || now - lastShock < 900) return;
-      const dist = Math.hypot(x - first.x, y - first.y);
-      const dt = (now - first.t) / 1000;
-      if (dist > 0.18 && dt > 0.03 && dist / dt > 1.7) {
-        lastShock = now;
-        shockRef.current = { x, y, at: now };
-        trail.length = 0;
-      }
     };
 
     const onPointerDown = (event: PointerEvent) => {
@@ -83,5 +67,5 @@ export function usePointerRipple(
       window.removeEventListener('pointerup', endContact);
       window.removeEventListener('pointercancel', endContact);
     };
-  }, [enabled, pointerRef, shockRef, targetRef]);
+  }, [enabled, pointerRef, targetRef]);
 }
