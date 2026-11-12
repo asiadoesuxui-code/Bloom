@@ -15,6 +15,13 @@
       "b": 153
     },
     {
+      "id": "bubbles_blush",
+      "srcRelative": "elements/bubbles_blush.png",
+      "r": 220,
+      "g": 193,
+      "b": 180
+    },
+    {
       "id": "bubbles_brown",
       "srcRelative": "elements/bubbles_brown.png",
       "r": 178,
@@ -22,11 +29,25 @@
       "b": 52
     },
     {
+      "id": "bubbles_cream",
+      "srcRelative": "elements/bubbles_cream.png",
+      "r": 220,
+      "g": 209,
+      "b": 184
+    },
+    {
       "id": "bubbles_darkblue",
       "srcRelative": "elements/bubbles_darkblue.png",
       "r": 43,
       "g": 63,
       "b": 109
+    },
+    {
+      "id": "bubbles_forest",
+      "srcRelative": "elements/bubbles_forest.png",
+      "r": 43,
+      "g": 85,
+      "b": 53
     },
     {
       "id": "bubbles_green",
@@ -43,6 +64,13 @@
       "b": 90
     },
     {
+      "id": "bubbles_midblue",
+      "srcRelative": "elements/bubbles_midblue.png",
+      "r": 29,
+      "g": 98,
+      "b": 143
+    },
+    {
       "id": "bubbles_orange",
       "srcRelative": "elements/bubbles_orange.png",
       "r": 224,
@@ -55,6 +83,13 @@
       "r": 203,
       "g": 134,
       "b": 139
+    },
+    {
+      "id": "bubbles_poppy",
+      "srcRelative": "elements/bubbles_poppy.png",
+      "r": 215,
+      "g": 64,
+      "b": 57
     },
     {
       "id": "bubbles_red",
@@ -85,6 +120,13 @@
       "b": 176
     },
     {
+      "id": "caro_blush",
+      "srcRelative": "elements/caro_blush.png",
+      "r": 223,
+      "g": 204,
+      "b": 196
+    },
+    {
       "id": "caro_brown",
       "srcRelative": "elements/caro_brown.png",
       "r": 114,
@@ -92,11 +134,25 @@
       "b": 38
     },
     {
+      "id": "caro_cream",
+      "srcRelative": "elements/caro_cream.png",
+      "r": 223,
+      "g": 218,
+      "b": 207
+    },
+    {
       "id": "caro_darkblue",
       "srcRelative": "elements/caro_darkblue.png",
       "r": 22,
       "g": 54,
       "b": 113
+    },
+    {
+      "id": "caro_forest",
+      "srcRelative": "elements/caro_forest.png",
+      "r": 60,
+      "g": 89,
+      "b": 59
     },
     {
       "id": "caro_green",
@@ -120,6 +176,13 @@
       "b": 117
     },
     {
+      "id": "caro_midblue",
+      "srcRelative": "elements/caro_midblue.png",
+      "r": 83,
+      "g": 122,
+      "b": 151
+    },
+    {
       "id": "caro_orange",
       "srcRelative": "elements/caro_orange.png",
       "r": 221,
@@ -132,6 +195,13 @@
       "r": 196,
       "g": 144,
       "b": 151
+    },
+    {
+      "id": "caro_poppy",
+      "srcRelative": "elements/caro_poppy.png",
+      "r": 198,
+      "g": 65,
+      "b": 62
     },
     {
       "id": "caro_red",
@@ -169,11 +239,25 @@
       "b": 57
     },
     {
+      "id": "chocolate_cream",
+      "srcRelative": "elements/chocolate_cream.png",
+      "r": 215,
+      "g": 210,
+      "b": 200
+    },
+    {
       "id": "chocolate_darkblue",
       "srcRelative": "elements/chocolate_darkblue.png",
       "r": 27,
       "g": 55,
       "b": 106
+    },
+    {
+      "id": "chocolate_forest",
+      "srcRelative": "elements/chocolate_forest.png",
+      "r": 51,
+      "g": 85,
+      "b": 56
     },
     {
       "id": "chocolate_green",
@@ -197,6 +281,13 @@
       "b": 138
     },
     {
+      "id": "chocolate_midblue",
+      "srcRelative": "elements/chocolate_midblue.png",
+      "r": 78,
+      "g": 122,
+      "b": 154
+    },
+    {
       "id": "chocolate_orange",
       "srcRelative": "elements/chocolate_orange.png",
       "r": 215,
@@ -209,6 +300,13 @@
       "r": 205,
       "g": 138,
       "b": 155
+    },
+    {
+      "id": "chocolate_poppy",
+      "srcRelative": "elements/chocolate_poppy.png",
+      "r": 208,
+      "g": 98,
+      "b": 92
     },
     {
       "id": "chocolate_red",
@@ -239,6 +337,13 @@
       "b": 180
     },
     {
+      "id": "clover_blush",
+      "srcRelative": "elements/clover_blush.png",
+      "r": 219,
+      "g": 201,
+      "b": 195
+    },
+    {
       "id": "clover_brown",
       "srcRelative": "elements/clover_brown.png",
       "r": 122,
@@ -246,11 +351,25 @@
       "b": 50
     },
     {
+      "id": "clover_cream",
+      "srcRelative": "elements/clover_cream.png",
+      "r": 218,
+      "g": 213,
+      "b": 202
+    },
+    {
       "id": "clover_darkblue",
       "srcRelative": "elements/clover_darkblue.png",
       "r": 10,
       "g": 41,
       "b": 106
+    },
+    {
+      "id": "clover_forest",
+      "srcRelative": "elements/clover_forest.png",
+      "r": 56,
+      "g": 90,
+      "b": 60
     },
     {
       "id": "clover_green",
@@ -274,6 +393,13 @@
       "b": 143
     },
     {
+      "id": "clover_midblue",
+      "srcRelative": "elements/clover_midblue.png",
+      "r": 80,
+      "g": 120,
+      "b": 150
+    },
+    {
       "id": "clover_orange",
       "srcRelative": "elements/clover_orange.png",
       "r": 239,
@@ -286,6 +412,13 @@
       "r": 194,
       "g": 123,
       "b": 144
+    },
+    {
+      "id": "clover_poppy",
+      "srcRelative": "elements/clover_poppy.png",
+      "r": 219,
+      "g": 82,
+      "b": 78
     },
     {
       "id": "clover_red",
@@ -316,6 +449,13 @@
       "b": 162
     },
     {
+      "id": "flower4_blush",
+      "srcRelative": "elements/flower4_blush.png",
+      "r": 218,
+      "g": 201,
+      "b": 193
+    },
+    {
       "id": "flower4_brown",
       "srcRelative": "elements/flower4_brown.png",
       "r": 130,
@@ -323,11 +463,25 @@
       "b": 54
     },
     {
+      "id": "flower4_cream",
+      "srcRelative": "elements/flower4_cream.png",
+      "r": 215,
+      "g": 210,
+      "b": 200
+    },
+    {
       "id": "flower4_darkblue",
       "srcRelative": "elements/flower4_darkblue.png",
       "r": 21,
       "g": 41,
       "b": 104
+    },
+    {
+      "id": "flower4_forest",
+      "srcRelative": "elements/flower4_forest.png",
+      "r": 55,
+      "g": 88,
+      "b": 58
     },
     {
       "id": "flower4_green",
@@ -351,6 +505,13 @@
       "b": 112
     },
     {
+      "id": "flower4_midblue",
+      "srcRelative": "elements/flower4_midblue.png",
+      "r": 74,
+      "g": 112,
+      "b": 146
+    },
+    {
       "id": "flower4_orange",
       "srcRelative": "elements/flower4_orange.png",
       "r": 242,
@@ -363,6 +524,13 @@
       "r": 188,
       "g": 113,
       "b": 133
+    },
+    {
+      "id": "flower4_poppy",
+      "srcRelative": "elements/flower4_poppy.png",
+      "r": 206,
+      "g": 71,
+      "b": 69
     },
     {
       "id": "flower4_red",
@@ -393,6 +561,13 @@
       "b": 175
     },
     {
+      "id": "flower6_blush",
+      "srcRelative": "elements/flower6_blush.png",
+      "r": 216,
+      "g": 197,
+      "b": 189
+    },
+    {
       "id": "flower6_brown",
       "srcRelative": "elements/flower6_brown.png",
       "r": 117,
@@ -400,11 +575,25 @@
       "b": 59
     },
     {
+      "id": "flower6_cream",
+      "srcRelative": "elements/flower6_cream.png",
+      "r": 219,
+      "g": 213,
+      "b": 204
+    },
+    {
       "id": "flower6_darkblue",
       "srcRelative": "elements/flower6_darkblue.png",
       "r": 21,
       "g": 43,
       "b": 102
+    },
+    {
+      "id": "flower6_forest",
+      "srcRelative": "elements/flower6_forest.png",
+      "r": 48,
+      "g": 84,
+      "b": 55
     },
     {
       "id": "flower6_green",
@@ -428,6 +617,13 @@
       "b": 136
     },
     {
+      "id": "flower6_midblue",
+      "srcRelative": "elements/flower6_midblue.png",
+      "r": 88,
+      "g": 125,
+      "b": 151
+    },
+    {
       "id": "flower6_orange",
       "srcRelative": "elements/flower6_orange.png",
       "r": 221,
@@ -440,6 +636,13 @@
       "r": 197,
       "g": 144,
       "b": 152
+    },
+    {
+      "id": "flower6_poppy",
+      "srcRelative": "elements/flower6_poppy.png",
+      "r": 196,
+      "g": 65,
+      "b": 65
     },
     {
       "id": "flower6_red",
@@ -470,6 +673,13 @@
       "b": 126
     },
     {
+      "id": "indent_blush",
+      "srcRelative": "elements/indent_blush.png",
+      "r": 225,
+      "g": 203,
+      "b": 197
+    },
+    {
       "id": "indent_brown",
       "srcRelative": "elements/indent_brown.png",
       "r": 131,
@@ -477,11 +687,25 @@
       "b": 53
     },
     {
+      "id": "indent_cream",
+      "srcRelative": "elements/indent_cream.png",
+      "r": 213,
+      "g": 206,
+      "b": 196
+    },
+    {
       "id": "indent_darkblue",
       "srcRelative": "elements/indent_darkblue.png",
       "r": 54,
       "g": 75,
       "b": 128
+    },
+    {
+      "id": "indent_forest",
+      "srcRelative": "elements/indent_forest.png",
+      "r": 52,
+      "g": 85,
+      "b": 58
     },
     {
       "id": "indent_green",
@@ -505,6 +729,13 @@
       "b": 85
     },
     {
+      "id": "indent_midblue",
+      "srcRelative": "elements/indent_midblue.png",
+      "r": 59,
+      "g": 104,
+      "b": 143
+    },
+    {
       "id": "indent_orange",
       "srcRelative": "elements/indent_orange.png",
       "r": 185,
@@ -517,6 +748,13 @@
       "r": 168,
       "g": 97,
       "b": 115
+    },
+    {
+      "id": "indent_poppy",
+      "srcRelative": "elements/indent_poppy.png",
+      "r": 207,
+      "g": 63,
+      "b": 59
     },
     {
       "id": "indent_red",
@@ -547,6 +785,13 @@
       "b": 143
     },
     {
+      "id": "leaf_blush",
+      "srcRelative": "elements/leaf_blush.png",
+      "r": 224,
+      "g": 202,
+      "b": 195
+    },
+    {
       "id": "leaf_brown",
       "srcRelative": "elements/leaf_brown.png",
       "r": 123,
@@ -554,11 +799,25 @@
       "b": 57
     },
     {
+      "id": "leaf_cream",
+      "srcRelative": "elements/leaf_cream.png",
+      "r": 217,
+      "g": 214,
+      "b": 206
+    },
+    {
       "id": "leaf_darkblue",
       "srcRelative": "elements/leaf_darkblue.png",
       "r": 29,
       "g": 62,
       "b": 111
+    },
+    {
+      "id": "leaf_forest",
+      "srcRelative": "elements/leaf_forest.png",
+      "r": 35,
+      "g": 69,
+      "b": 47
     },
     {
       "id": "leaf_green",
@@ -582,6 +841,13 @@
       "b": 96
     },
     {
+      "id": "leaf_midblue",
+      "srcRelative": "elements/leaf_midblue.png",
+      "r": 44,
+      "g": 91,
+      "b": 129
+    },
+    {
       "id": "leaf_orange",
       "srcRelative": "elements/leaf_orange.png",
       "r": 212,
@@ -594,6 +860,13 @@
       "r": 185,
       "g": 126,
       "b": 135
+    },
+    {
+      "id": "leaf_poppy",
+      "srcRelative": "elements/leaf_poppy.png",
+      "r": 202,
+      "g": 51,
+      "b": 55
     },
     {
       "id": "leaf_red",
@@ -624,6 +897,13 @@
       "b": 158
     },
     {
+      "id": "mosaic_blush",
+      "srcRelative": "elements/mosaic_blush.png",
+      "r": 213,
+      "g": 195,
+      "b": 195
+    },
+    {
       "id": "mosaic_brown",
       "srcRelative": "elements/mosaic_brown.png",
       "r": 146,
@@ -631,11 +911,25 @@
       "b": 77
     },
     {
+      "id": "mosaic_cream",
+      "srcRelative": "elements/mosaic_cream.png",
+      "r": 219,
+      "g": 220,
+      "b": 215
+    },
+    {
       "id": "mosaic_darkblue",
       "srcRelative": "elements/mosaic_darkblue.png",
       "r": 71,
       "g": 109,
       "b": 154
+    },
+    {
+      "id": "mosaic_forest",
+      "srcRelative": "elements/mosaic_forest.png",
+      "r": 88,
+      "g": 92,
+      "b": 71
     },
     {
       "id": "mosaic_green",
@@ -659,6 +953,13 @@
       "b": 152
     },
     {
+      "id": "mosaic_midblue",
+      "srcRelative": "elements/mosaic_midblue.png",
+      "r": 96,
+      "g": 126,
+      "b": 144
+    },
+    {
       "id": "mosaic_orange",
       "srcRelative": "elements/mosaic_orange.png",
       "r": 215,
@@ -671,6 +972,13 @@
       "r": 200,
       "g": 141,
       "b": 158
+    },
+    {
+      "id": "mosaic_poppy",
+      "srcRelative": "elements/mosaic_poppy.png",
+      "r": 219,
+      "g": 143,
+      "b": 137
     },
     {
       "id": "mosaic_red",
@@ -701,11 +1009,32 @@
       "b": 130
     },
     {
+      "id": "pebble_blush",
+      "srcRelative": "elements/pebble_blush.png",
+      "r": 225,
+      "g": 201,
+      "b": 195
+    },
+    {
+      "id": "pebble_cream",
+      "srcRelative": "elements/pebble_cream.png",
+      "r": 220,
+      "g": 211,
+      "b": 195
+    },
+    {
       "id": "pebble_darkblue",
       "srcRelative": "elements/pebble_darkblue.png",
       "r": 21,
       "g": 47,
       "b": 114
+    },
+    {
+      "id": "pebble_forest",
+      "srcRelative": "elements/pebble_forest.png",
+      "r": 47,
+      "g": 82,
+      "b": 53
     },
     {
       "id": "pebble_green",
@@ -729,6 +1058,13 @@
       "b": 101
     },
     {
+      "id": "pebble_midblue",
+      "srcRelative": "elements/pebble_midblue.png",
+      "r": 70,
+      "g": 105,
+      "b": 145
+    },
+    {
       "id": "pebble_orange",
       "srcRelative": "elements/pebble_orange.png",
       "r": 227,
@@ -741,6 +1077,13 @@
       "r": 192,
       "g": 96,
       "b": 128
+    },
+    {
+      "id": "pebble_poppy",
+      "srcRelative": "elements/pebble_poppy.png",
+      "r": 208,
+      "g": 63,
+      "b": 63
     },
     {
       "id": "pebble_red",
@@ -778,6 +1121,13 @@
       "b": 178
     },
     {
+      "id": "plain_blush",
+      "srcRelative": "elements/plain_blush.png",
+      "r": 221,
+      "g": 204,
+      "b": 198
+    },
+    {
       "id": "plain_brown",
       "srcRelative": "elements/plain_brown.png",
       "r": 98,
@@ -785,11 +1135,25 @@
       "b": 42
     },
     {
+      "id": "plain_cream",
+      "srcRelative": "elements/plain_cream.png",
+      "r": 219,
+      "g": 214,
+      "b": 203
+    },
+    {
       "id": "plain_darkblue",
       "srcRelative": "elements/plain_darkblue.png",
       "r": 5,
       "g": 37,
       "b": 105
+    },
+    {
+      "id": "plain_forest",
+      "srcRelative": "elements/plain_forest.png",
+      "r": 61,
+      "g": 96,
+      "b": 63
     },
     {
       "id": "plain_green",
@@ -813,6 +1177,13 @@
       "b": 147
     },
     {
+      "id": "plain_midblue",
+      "srcRelative": "elements/plain_midblue.png",
+      "r": 93,
+      "g": 128,
+      "b": 154
+    },
+    {
       "id": "plain_orange",
       "srcRelative": "elements/plain_orange.png",
       "r": 217,
@@ -825,6 +1196,13 @@
       "r": 183,
       "g": 107,
       "b": 128
+    },
+    {
+      "id": "plain_poppy",
+      "srcRelative": "elements/plain_poppy.png",
+      "r": 198,
+      "g": 59,
+      "b": 61
     },
     {
       "id": "plain_red",
@@ -855,6 +1233,13 @@
       "b": 165
     },
     {
+      "id": "round_blush",
+      "srcRelative": "elements/round_blush.png",
+      "r": 212,
+      "g": 190,
+      "b": 184
+    },
+    {
       "id": "round_brown",
       "srcRelative": "elements/round_brown.png",
       "r": 123,
@@ -862,11 +1247,25 @@
       "b": 53
     },
     {
+      "id": "round_cream",
+      "srcRelative": "elements/round_cream.png",
+      "r": 218,
+      "g": 213,
+      "b": 202
+    },
+    {
       "id": "round_darkblue",
       "srcRelative": "elements/round_darkblue.png",
       "r": 41,
       "g": 66,
       "b": 119
+    },
+    {
+      "id": "round_forest",
+      "srcRelative": "elements/round_forest.png",
+      "r": 56,
+      "g": 96,
+      "b": 66
     },
     {
       "id": "round_green",
@@ -890,6 +1289,13 @@
       "b": 123
     },
     {
+      "id": "round_midblue",
+      "srcRelative": "elements/round_midblue.png",
+      "r": 86,
+      "g": 130,
+      "b": 162
+    },
+    {
       "id": "round_orange",
       "srcRelative": "elements/round_orange.png",
       "r": 213,
@@ -902,6 +1308,13 @@
       "r": 200,
       "g": 142,
       "b": 153
+    },
+    {
+      "id": "round_poppy",
+      "srcRelative": "elements/round_poppy.png",
+      "r": 205,
+      "g": 101,
+      "b": 98
     },
     {
       "id": "round_red",
@@ -932,6 +1345,13 @@
       "b": 189
     },
     {
+      "id": "spinner_blush",
+      "srcRelative": "elements/spinner_blush.png",
+      "r": 219,
+      "g": 201,
+      "b": 193
+    },
+    {
       "id": "spinner_brown",
       "srcRelative": "elements/spinner_brown.png",
       "r": 118,
@@ -939,11 +1359,25 @@
       "b": 43
     },
     {
+      "id": "spinner_cream",
+      "srcRelative": "elements/spinner_cream.png",
+      "r": 216,
+      "g": 211,
+      "b": 200
+    },
+    {
       "id": "spinner_darkblue",
       "srcRelative": "elements/spinner_darkblue.png",
       "r": 13,
       "g": 41,
       "b": 114
+    },
+    {
+      "id": "spinner_forest",
+      "srcRelative": "elements/spinner_forest.png",
+      "r": 63,
+      "g": 99,
+      "b": 65
     },
     {
       "id": "spinner_green",
@@ -967,6 +1401,13 @@
       "b": 137
     },
     {
+      "id": "spinner_midblue",
+      "srcRelative": "elements/spinner_midblue.png",
+      "r": 89,
+      "g": 127,
+      "b": 153
+    },
+    {
       "id": "spinner_orange",
       "srcRelative": "elements/spinner_orange.png",
       "r": 217,
@@ -979,6 +1420,13 @@
       "r": 197,
       "g": 136,
       "b": 145
+    },
+    {
+      "id": "spinner_poppy",
+      "srcRelative": "elements/spinner_poppy.png",
+      "r": 198,
+      "g": 62,
+      "b": 61
     },
     {
       "id": "spinner_red",
@@ -1009,6 +1457,13 @@
       "b": 152
     },
     {
+      "id": "triangle_blush",
+      "srcRelative": "elements/triangle_blush.png",
+      "r": 214,
+      "g": 188,
+      "b": 179
+    },
+    {
       "id": "triangle_brown",
       "srcRelative": "elements/triangle_brown.png",
       "r": 111,
@@ -1016,11 +1471,25 @@
       "b": 48
     },
     {
+      "id": "triangle_cream",
+      "srcRelative": "elements/triangle_cream.png",
+      "r": 219,
+      "g": 212,
+      "b": 199
+    },
+    {
       "id": "triangle_darkblue",
       "srcRelative": "elements/triangle_darkblue.png",
       "r": 24,
       "g": 48,
       "b": 101
+    },
+    {
+      "id": "triangle_forest",
+      "srcRelative": "elements/triangle_forest.png",
+      "r": 54,
+      "g": 88,
+      "b": 53
     },
     {
       "id": "triangle_green",
@@ -1044,6 +1513,13 @@
       "b": 123
     },
     {
+      "id": "triangle_midblue",
+      "srcRelative": "elements/triangle_midblue.png",
+      "r": 76,
+      "g": 117,
+      "b": 145
+    },
+    {
       "id": "triangle_orange",
       "srcRelative": "elements/triangle_orange.png",
       "r": 211,
@@ -1056,6 +1532,13 @@
       "r": 188,
       "g": 127,
       "b": 137
+    },
+    {
+      "id": "triangle_poppy",
+      "srcRelative": "elements/triangle_poppy.png",
+      "r": 202,
+      "g": 75,
+      "b": 73
     },
     {
       "id": "triangle_red",

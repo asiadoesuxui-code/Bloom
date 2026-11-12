@@ -5,6 +5,11 @@ import { parseTileKeysFromId } from './tileKeys';
 import {
   isBlueCeramicFamily,
   isBrownCeramicFamily,
+  isGreenLeaningSample,
+  isLeafyGreenCeramicFamily,
+  isLightNeutralCeramicFamily,
+  isLightNeutralSample,
+  isScarletCeramicFamily,
   shouldSuppressConflictingEarthTones,
   isBrightGoldenFlowerSample,
   isClearlyBlueDominantSample,
@@ -164,12 +169,14 @@ function eligibleColorKeys(
 
   /**
    * Sunflower.png: warm petals satisfy `isWarmBrownOrangeSample`, which turns OFF global blue/brown
-   * suppression on foliage rules — so `_darkblue` / `_red` can win on luminance. Drop them unless
-   * the cell is actually blue- or true-red-dominant.
+   * suppression on foliage rules — so blues and true reds (`red`, `poppy`) can win on luminance.
+   * Drop them unless the cell is actually blue- or true-red-dominant.
    */
   if (stem === 'sunflower') {
     if (!isClearlyScarletOrMagentaRedSample(r, g, b)) {
-      keys.delete('red');
+      for (const k of [...keys]) {
+        if (isScarletCeramicFamily(k)) keys.delete(k);
+      }
     }
     if (!isClearlyBlueDominantSample(r, g, b)) {
       for (const k of [...keys]) {
@@ -178,14 +185,17 @@ function eligibleColorKeys(
     }
   }
 
-  /** three.png / five.png: teal foliage averages should stay on `_green` / `_lightgreen`, not aqua `_seagreen`. */
+  /** three.png / five.png: teal foliage averages should stay off aqua `_seagreen`. `forest` may still be used. */
   const leafyGreenMixNoSeagreen = stem === 'three' || stem === 'five';
 
   if (shouldRestrictToLeafyGreenFamilies(r, g, b, lab)) {
-    const leafKeys = leafyGreenMixNoSeagreen
-      ? new Set<string>(['green', 'lightgreen'])
-      : new Set<string>(['green', 'lightgreen', 'seagreen']);
-    keys = new Set(all.filter((k) => leafKeys.has(k)));
+    keys = new Set(
+      all.filter((k) => {
+        if (!isLeafyGreenCeramicFamily(k)) return false;
+        if (leafyGreenMixNoSeagreen && k === 'seagreen') return false;
+        return true;
+      }),
+    );
     if (keys.size === 0) keys = new Set(all);
   } else if (shouldSuppressConflictingEarthTones(r, g, b, lab)) {
     for (const k of [...keys]) {
@@ -195,6 +205,18 @@ function eligibleColorKeys(
 
   if (leafyGreenMixNoSeagreen) {
     keys.delete('seagreen');
+  }
+
+  // Forest is a foliage green, not a dark-neutral stand-in.
+  if (!isGreenLeaningSample(r, g, b)) {
+    keys.delete('forest');
+  }
+
+  // Cream and blush are petal and paper neutrals. A pale cell must not lose them.
+  if (isLightNeutralSample(r, g, b)) {
+    for (const k of all) {
+      if (isLightNeutralCeramicFamily(k)) keys.add(k);
+    }
   }
 
   if (keys.size === 0) return new Set(all);

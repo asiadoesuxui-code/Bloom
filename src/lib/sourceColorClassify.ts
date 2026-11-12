@@ -1,8 +1,59 @@
 import type { Oklab } from './colorSpace';
 
-/** Ceramic variant names that read visually blue — never use on leafy greens */
+/**
+ * Ceramic blues — `darkblue`, `lightblue`, and `midblue`.
+ * `seagreen` does not match. These stay off foliage unless the sample is actually blue.
+ */
 export function isBlueCeramicFamily(colorKey: string): boolean {
   return colorKey.toLowerCase().includes('blue');
+}
+
+/**
+ * A cell with a real green cast. `forest` is only eligible here, so it can join
+ * the leafy greens without standing in for charcoal, teal shadow, or a grey wall.
+ */
+export function isGreenLeaningSample(r: number, g: number, b: number): boolean {
+  const greenExcess = g - 0.5 * (r + b);
+  if (greenExcess < 10) return false;
+  if (b > g + 6) return false;
+  if (r > g + 14) return false;
+  return true;
+}
+
+/** Foliage ceramics. `forest` belongs with `green`, `lightgreen`, and `seagreen`. */
+export function isLeafyGreenCeramicFamily(colorKey: string): boolean {
+  switch (colorKey.toLowerCase()) {
+    case 'green':
+    case 'lightgreen':
+    case 'seagreen':
+    case 'forest':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Deep `red` and bright `poppy` share the true-red gate. */
+export function isScarletCeramicFamily(colorKey: string): boolean {
+  const key = colorKey.toLowerCase();
+  return key === 'red' || key === 'poppy';
+}
+
+/** Pale petal and paper colours. They stay eligible on light grounds. */
+export function isLightNeutralCeramicFamily(colorKey: string): boolean {
+  const key = colorKey.toLowerCase();
+  return key === 'cream' || key === 'blush';
+}
+
+/**
+ * A pale, weakly hued cell: cream paper, a white petal, a blush wash.
+ * Saturated blooms fall outside this, so cream and blush are not pushed onto them.
+ */
+export function isLightNeutralSample(r: number, g: number, b: number): boolean {
+  const sum = r + g + b;
+  if (sum < 460) return false;
+  const spread = Math.max(r, g, b) - Math.min(r, g, b);
+  return spread < 62;
 }
 
 /** `_brown`, `darkbrown`, etc. — confusable with dark greens in distance-only matching */
