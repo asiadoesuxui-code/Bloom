@@ -18,6 +18,7 @@ import {
   isClearlyBlueDominantSample,
   isSunflowerSeedCentreSample,
 } from './sourceColorClassify';
+import { LABEL_FAMILIES, type PaintedScene } from './scenePaint';
 import { GRID_H, GRID_W, waveRankMap } from './waveOrder';
 
 export type MosaicFit = 'stretch' | 'cover';
@@ -255,10 +256,14 @@ function pickTileForPixel(
   buckets: Map<string, TileMeta[]>,
   seed: number,
   sourceStem: string | undefined,
+  /** When set, photo-specific gates are skipped and only these families compete. */
+  restrictKeys?: ReadonlySet<string> | null,
 ): TileMeta | null {
   const sampleLab = rgbToOklab(r, g, b);
 
-  let eligible = eligibleColorKeys(buckets, r, g, b, sampleLab, sourceStem);
+  let eligible = restrictKeys
+    ? new Set([...restrictKeys].filter((key) => (buckets.get(key)?.length ?? 0) > 0))
+    : eligibleColorKeys(buckets, r, g, b, sampleLab, sourceStem);
 
   const famDists: { key: string; d2: number }[] = [];
   for (const key of eligible) {
@@ -268,7 +273,7 @@ function pickTileForPixel(
     famDists.push({ key, d2: familyDistanceForRanking(rawD2, key, sourceStem, r, g, b) });
   }
 
-  if (famDists.length === 0) {
+  if (famDists.length === 0 && !restrictKeys) {
     for (const key of buckets.keys()) {
       const fam = buckets.get(key);
       if (!fam || fam.length === 0) continue;
@@ -368,6 +373,76 @@ async function yieldToMain(): Promise<void> {
       requestAnimationFrame(() => resolve());
     }
   });
+}
+
+function familiesForSceneCell(scene: PaintedScene, index: number): ReadonlySet<string> {
+  const cell = scene.cells[index]!;
+  if (cell.label === 'centre' && cell.flowerId > 0) {
+    const listed = scene.centreFamilies[cell.flowerId];
+    if (listed && listed.length > 0) return new Set(listed);
+  }
+  return new Set(LABEL_FAMILIES[cell.label]);
+}
+
+/** Tile a painted scene. Labels choose the family set; colour chooses within it. */
+export function buildMosaicFromScene(
+  tiles: ResolvedTile[],
+  varietySeed: number,
+  scene: PaintedScene,
+): MosaicCell[] {
+  const gridW = scene.gridW;
+  const gridH = scene.gridH;
+  const meta = buildTileMeta(tilesWithLab(tiles));
+  const buckets = bucketTilesByColor(meta);
+  const ranks = waveRankMap(gridW, gridH);
+  const totalCells = gridW * gridH;
+  const maxRank = Math.max(1, totalCells - 1);
+  const staggerSpanSec = REVEAL_TOTAL_MS / 1000 - REVEAL_TILE_DURATION_SEC;
+  const chaosMaxSec = staggerSpanSec * REVEAL_CHAOS_FRAC;
+  const rippleMaxSec = staggerSpanSec * REVEAL_RIPPLE_FRAC;
+  const ripplePhiRad = ripplePhaseRad(varietySeed);
+  const cells: MosaicCell[] = [];
+
+  for (let i = 0; i < scene.cells.length; i++) {
+    const painted = scene.cells[i]!;
+    const cx = i % gridW;
+    const cy = Math.floor(i / gridW);
+    const choice = pickTileForPixel(
+      painted.r,
+      painted.g,
+      painted.b,
+      cx,
+      cy,
+      buckets,
+      varietySeed,
+      undefined,
+      familiesForSceneCell(scene, i),
+    );
+    if (!choice) throw new Error(`No tile for ${painted.label} cell ${cx},${cy}`);
+    const rank = ranks.get(`${cx},${cy}`) ?? 0;
+    const baseDelaySec = (rank / maxRank) * staggerSpanSec;
+    const delaySec = Math.min(
+      staggerSpanSec,
+      Math.max(
+        0,
+        baseDelaySec +
+          revealChaosOffsetSec(cx, cy, varietySeed, chaosMaxSec) +
+          revealRippleOffsetSec(cx, cy, ripplePhiRad, rippleMaxSec),
+      ),
+    );
+    cells.push({
+      cx,
+      cy,
+      url: choice.url,
+      delaySec,
+      seed: hashSeed(cx, cy, choice.id),
+    });
+  }
+
+  if (cells.length !== totalCells) {
+    throw new Error('Scene grid does not match the painted cells');
+  }
+  return cells;
 }
 
 export async function buildMosaicFromImageUrl(

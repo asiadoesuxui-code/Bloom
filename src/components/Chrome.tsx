@@ -1,3 +1,5 @@
+export type PictureMode = 'classic' | 'original';
+
 type ChromeProps = {
   onGenerate: () => void;
   /** Disable generate while computing mosaic */
@@ -11,6 +13,8 @@ type ChromeProps = {
   missingSources: boolean;
   /** Portrait phones: title and Generate share one top bar so the mosaic can fill the screen. */
   portrait?: boolean;
+  pictureMode: PictureMode;
+  onPictureMode: (mode: PictureMode) => void;
 };
 
 export function Chrome({
@@ -21,8 +25,10 @@ export function Chrome({
   missingTiles,
   missingSources,
   portrait = false,
+  pictureMode,
+  onPictureMode,
 }: ChromeProps) {
-  const cantRun = missingTiles || missingSources || computeBusy;
+  const cantRun = missingTiles || (pictureMode === 'classic' && missingSources) || computeBusy;
   const warn = missingTiles || missingSources;
 
   const button = (
@@ -45,6 +51,38 @@ export function Chrome({
     >
       {computeBusy ? 'Generating…' : artworkReady && hasCells ? 'Regenerate' : 'Generate'}
     </button>
+  );
+
+  const modeSwitch = (
+    <div
+      role="group"
+      aria-label="Picture source"
+      style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 999, background: 'rgba(255,255,255,0.06)' }}
+    >
+      {(['classic', 'original'] as const).map((mode) => {
+        const on = pictureMode === mode;
+        return (
+          <button
+            key={mode}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onPictureMode(mode)}
+            style={{
+              border: 0,
+              borderRadius: 999,
+              padding: portrait ? '6px 10px' : '6px 12px',
+              background: on ? 'rgba(255,255,255,0.16)' : 'transparent',
+              color: on ? 'rgba(248,248,252,0.96)' : 'rgba(245,245,245,0.62)',
+              boxShadow: 'none',
+              fontSize: 12,
+              letterSpacing: '0.04em',
+            }}
+          >
+            {mode === 'classic' ? 'Classic' : 'Original'}
+          </button>
+        );
+      })}
+    </div>
   );
 
   const warning = warn ? (
@@ -85,6 +123,7 @@ export function Chrome({
           Bloom
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          {modeSwitch}
           {button}
           {warning}
         </div>
@@ -123,6 +162,7 @@ export function Chrome({
           flexWrap: 'wrap',
         }}
       >
+        {modeSwitch}
         {button}
         {warning}
       </footer>
