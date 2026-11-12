@@ -15,10 +15,13 @@ export type SceneCell = {
   flowerId: number;
 };
 
+export type SceneComposition = 'meadow' | 'bouquet' | 'vase' | 'hero' | 'field';
+
 export type PaintedScene = {
   gridW: number;
   gridH: number;
   cells: SceneCell[];
+  composition: SceneComposition;
   /** Contrast families allowed on each flower's centre. */
   centreFamilies: Record<number, readonly string[]>;
 };
@@ -33,22 +36,21 @@ export type Rgb = { r: number; g: number; b: number };
 export const LABEL_FAMILIES: Record<SceneLabel, readonly string[]> = {
   sky: ['lightblue', 'midblue', 'seagreen'],
   water: ['lightblue', 'midblue', 'seagreen'],
-  ground: ['cream', 'beige', 'brown'],
+  ground: ['cream', 'beige', 'blush'],
   leaf: ['lightgreen', 'green', 'forest'],
   stem: ['lightgreen', 'green', 'forest'],
-  petal: ['poppy', 'pink', 'blush', 'yellow', 'orange', 'cream', 'red'],
+  petal: ['poppy', 'pink', 'blush', 'yellow', 'orange', 'cream', 'red', 'midblue'],
   centre: ['yellow', 'orange', 'brown', 'darkblue', 'cream'],
 };
 
 const WARM_PETALS = new Set(['poppy', 'red', 'pink', 'blush', 'orange', 'yellow']);
 
 export function centreFamiliesForPetal(petal: string): readonly string[] {
-  if (petal === 'yellow') return ['brown', 'darkblue', 'orange'];
-  if (petal === 'orange') return ['yellow', 'darkblue', 'brown'];
-  if (petal === 'midblue' || petal === 'lightblue' || petal === 'darkblue') return ['yellow', 'orange', 'cream'];
-  if (petal === 'cream' || petal === 'blush') return ['poppy', 'orange', 'midblue'];
-  if (WARM_PETALS.has(petal)) return ['yellow', 'cream', 'darkblue'];
-  return ['yellow', 'orange', 'darkblue'];
+  if (petal === 'yellow' || petal === 'orange') return ['poppy', 'cream', 'pink'];
+  if (petal === 'midblue' || petal === 'lightblue' || petal === 'darkblue') return ['yellow', 'cream', 'orange'];
+  if (petal === 'cream' || petal === 'blush') return ['yellow', 'orange', 'poppy'];
+  if (WARM_PETALS.has(petal)) return ['yellow', 'cream', 'orange'];
+  return ['yellow', 'orange', 'cream'];
 }
 
 export function familyMeans(tiles: { id: string; r: number; g: number; b: number }[]): Record<string, Rgb> {
@@ -115,6 +117,8 @@ function jitter(rgb: Rgb, rnd: () => number, amount = 7): Rgb {
   };
 }
 
+type FlowerShape = 'daisy' | 'tulip' | 'poppy' | 'rose' | 'cluster';
+
 type Flower = {
   id: number;
   x: number;
@@ -122,11 +126,30 @@ type Flower = {
   radius: number;
   angle: number;
   petal: string;
+  /** A second petal colour inside the bloom, so the flower has a real edge. */
+  inner: string;
   centre: string;
+  shape: FlowerShape;
 };
+
+const COMPOSITIONS: SceneComposition[] = ['meadow', 'bouquet', 'vase', 'hero', 'field'];
+
+export function compositionForSeed(seed: number): SceneComposition {
+  const n = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) >>> 0;
+  return COMPOSITIONS[n % COMPOSITIONS.length]!;
+}
+
+const BAYER = [
+  [0, 8, 2, 10],
+  [12, 4, 14, 6],
+  [3, 11, 1, 9],
+  [15, 7, 13, 5],
+];
+
 
 /**
  * Paint one original flower scene. `seed` fully determines the picture for a given grid.
+ * The composition is part of the seed, so two seeds are different pictures, not a reshuffle.
  */
 export function paintFlowerScene(
   seed: number,
@@ -135,6 +158,7 @@ export function paintFlowerScene(
   means: Record<string, Rgb>,
 ): PaintedScene {
   const rnd = mulberry32(seed || 1);
+  const composition = compositionForSeed(seed);
   const cells: SceneCell[] = Array.from({ length: gridW * gridH }, () => ({
     r: 0,
     g: 0,
@@ -142,295 +166,477 @@ export function paintFlowerScene(
     label: 'sky' as SceneLabel,
     flowerId: 0,
   }));
-  const at = (x: number, y: number) => {
-    if (x < 0 || y < 0 || x >= gridW || y >= gridH) return null;
-    return cells[y * gridW + x]!;
-  };
 
-  const horizonBase = gridH * (0.38 + (seed % 97) / 97 * 0.12);
-  const horizon = (x: number) => {
-    const wobble = fbm(x * 0.16, 0.35, seed + 3) - 0.5;
-    const fine = fbm(x * 0.48, 2.2, seed + 19) - 0.5;
-    return horizonBase + wobble * gridH * 0.22 + fine * gridH * 0.07;
-  };
+  const horizon = horizonFor(composition, gridH, rnd);
+  const background = backgroundFor(composition);
+  const vase = composition === 'vase' ? vaseFor(seed, gridW, gridH) : null;
+  const flowers = placeFlowers(composition, gridW, gridH, horizon, rnd, vase);
 
-  for (let y = 0; y < gridH; y++) {
-    for (let x = 0; x < gridW; x++) {
-      const h = horizon(x);
-      const cell = at(x, y)!;
-      const below = y > h;
-      cell.label = below ? 'water' : 'sky';
-      cell.flowerId = 0;
-    }
-  }
-
-  // Irregular ground shoals. The edge follows noise, not a second straight line.
-  for (let y = 0; y < gridH; y++) {
-    for (let x = 0; x < gridW; x++) {
-      const shore = fbm(x * 0.22, y * 0.22, seed + 27);
-      const depth = (y - horizon(x)) / gridH;
-      if (depth > 0.18 && shore > 0.62) {
-        const cell = at(x, y)!;
-        if (cell.label === 'water') cell.label = 'ground';
+  for (let y = 0; y < gridH; y += 1) {
+    for (let x = 0; x < gridW; x += 1) {
+      const cell = cells[y * gridW + x]!;
+      if (vase && (pointInVase(x, y, vase) || y >= gridH * 0.9)) {
+        cell.label = 'ground';
+      } else if (background === 'wall') {
+        cell.label = 'ground';
+      } else if (background === 'foliage' || y >= horizon) {
+        cell.label = 'leaf';
+      } else {
+        cell.label = 'sky';
       }
     }
   }
 
-  colorByLabel(cells, gridW, gridH, 'sky', LABEL_FAMILIES.sky, means, seed + 1, 'wash');
-  colorByLabel(cells, gridW, gridH, 'water', LABEL_FAMILIES.water, means, seed + 2, 'wash');
-  colorByLabel(cells, gridW, gridH, 'ground', LABEL_FAMILIES.ground, means, seed + 3, 'soft');
-
-  const paintDisk = (
-    cx: number,
-    cy: number,
-    rx: number,
-    ry: number,
-    rot: number,
-    label: SceneLabel,
-    flowerId: number,
-    rgb: Rgb,
-  ) => {
-    const pad = Math.ceil(Math.max(rx, ry) + 1.2);
-    const cos = Math.cos(rot);
-    const sin = Math.sin(rot);
-    for (let y = Math.floor(cy - pad); y <= Math.ceil(cy + pad); y++) {
-      for (let x = Math.floor(cx - pad); x <= Math.ceil(cx + pad); x++) {
-        const cell = at(x, y);
-        if (!cell) continue;
-        const dx = x + 0.5 - cx;
-        const dy = y + 0.5 - cy;
-        const lx = dx * cos + dy * sin;
-        const ly = -dx * sin + dy * cos;
-        const d = (lx * lx) / (rx * rx) + (ly * ly) / (ry * ry);
-        if (d > 1.2) continue;
-        const cover = d < 0.75 ? 1 : Math.max(0, (1.2 - d) / 0.45);
-        cell.r = clampByte(cell.r * (1 - cover) + rgb.r * cover);
-        cell.g = clampByte(cell.g * (1 - cover) + rgb.g * cover);
-        cell.b = clampByte(cell.b * (1 - cover) + rgb.b * cover);
-        if (cover > 0.5) {
-          cell.label = label;
-          cell.flowerId = flowerId;
-        }
+  if (vase) {
+    const mouth = vase.top;
+    for (let y = Math.floor(mouth - 6); y < mouth + 1; y += 1) {
+      for (let x = Math.floor(vase.cx - 1); x <= Math.ceil(vase.cx + 1); x += 1) {
+        const cell = cells[y * gridW + x];
+        if (cell && cell.flowerId === 0) cell.label = 'stem';
       }
-    }
-  };
-
-  // Background clumps, painted before flowers so blooms stay on top.
-  const clumps = 5 + Math.floor(rnd() * 3);
-  for (let i = 0; i < clumps; i++) {
-    const cx = rnd() * gridW;
-    const cy = horizonBase + rnd() * (gridH - horizonBase) * 0.85;
-    paintDisk(cx, cy, 3 + rnd() * 4, 2 + rnd() * 2.5, rnd() * Math.PI, 'leaf', 0, means.green ?? { r: 80, g: 120, b: 70 });
-  }
-
-  // Every scene uses the new palette: poppy, blush, and cream as petals, midblue in the sky, forest in the leaves.
-  const petalChoices = shuffle(['poppy', 'yellow', 'pink', 'cream', 'blush'], rnd);
-  const flowerCount = petalChoices.length;
-  const flowers: Flower[] = [];
-  const usedCentres = new Set<string>();
-  for (let i = 0; i < flowerCount; i++) {
-    const petal = petalChoices[i]!;
-    const centreList = centreFamiliesForPetal(petal);
-    const centre = centreList.find((name) => !usedCentres.has(name)) ?? centreList[0]!;
-    usedCentres.add(centre);
-    let placed = false;
-    for (let attempt = 0; attempt < 40 && !placed; attempt++) {
-      const x = 5 + rnd() * (gridW - 10);
-      const y = gridH * (0.16 + rnd() * 0.48);
-      const radius = 4.1;
-      const hit = flowers.some((f) => Math.hypot(f.x - x, f.y - y) < f.radius + radius + 1.2);
-      if (hit) continue;
-      flowers.push({ id: i + 1, x, y, radius, angle: rnd() * Math.PI * 2, petal, centre });
-      placed = true;
     }
   }
 
   const centreFamilies: Record<number, readonly string[]> = {};
   for (const flower of flowers) {
-    centreFamilies[flower.id] = centreFamiliesForPetal(flower.petal);
-    const stemRgb = means.green ?? { r: 70, g: 110, b: 60 };
-    let px = flower.x;
-    let py = flower.y + flower.radius * 0.4;
-    const sway = (rnd() - 0.5) * 0.55;
-    for (let step = 0; py < gridH + 1; step++) {
-      py += 0.85;
-      px += sway + Math.sin(py * 0.45 + flower.angle) * 0.35;
-      const cell = at(Math.round(px), Math.round(py));
-      if (!cell) continue;
-      if (cell.label === 'petal' || cell.label === 'centre') continue;
-      cell.label = 'stem';
-      cell.flowerId = flower.id;
-      cell.r = stemRgb.r;
-      cell.g = stemRgb.g;
-      cell.b = stemRgb.b;
-      if (step % 4 === 2) {
-        const side = step % 8 === 2 ? 1 : -1;
-        paintDisk(
-          px + side * 2.2,
-          py,
-          2.1,
-          1.1,
-          side * 0.8,
-          'leaf',
-          0,
-          means.lightgreen ?? stemRgb,
-        );
-      }
-    }
-
-    const petalRgb = jitter(means[flower.petal] ?? { r: 200, g: 80, b: 80 }, rnd, 5);
-    const petals = 6;
-    for (let p = 0; p < petals; p++) {
-      const a = flower.angle + (p / petals) * Math.PI * 2;
-      const ox = Math.cos(a) * flower.radius * 0.52;
-      const oy = Math.sin(a) * flower.radius * 0.52;
-      paintDisk(flower.x + ox, flower.y + oy, flower.radius * 0.62, flower.radius * 0.4, a, 'petal', flower.id, petalRgb);
-    }
-    const centreRgb = jitter(means[flower.centre] ?? { r: 220, g: 180, b: 40 }, rnd, 4);
-    paintDisk(flower.x, flower.y, 1.7, 1.7, 0, 'centre', flower.id, centreRgb);
+    centreFamilies[flower.id] = [flower.centre];
+    stampFlower(cells, gridW, gridH, flower);
   }
-
-  // One soft light-to-dark shading shared by leaves and stems. No teal, no blue.
-  colorByLabel(cells, gridW, gridH, 'leaf', LABEL_FAMILIES.leaf, means, seed + 4, 'soft');
-  colorByLabel(cells, gridW, gridH, 'stem', LABEL_FAMILIES.stem, means, seed + 4, 'soft');
-
-  // Petals were blended at the rim. Snap each flower back to its family colour.
+  for (const flower of flowers) stampCentre(cells, gridW, gridH, flower);
+  // A later bloom can cover an earlier one. Put a covered flower back so its colour survives.
   for (const flower of flowers) {
-    const rgb = means[flower.petal];
-    const centre = means[flower.centre];
-    if (!rgb || !centre) continue;
-    for (const cell of cells) {
-      if (cell.flowerId !== flower.id) continue;
-      if (cell.label === 'petal') {
-        cell.r = rgb.r;
-        cell.g = rgb.g;
-        cell.b = rgb.b;
-      } else if (cell.label === 'centre') {
-        cell.r = centre.r;
-        cell.g = centre.g;
-        cell.b = centre.b;
-      }
-    }
+    if (cells.some((cell) => cell.flowerId === flower.id && cell.label === 'petal')) continue;
+    stampFlower(cells, gridW, gridH, flower);
+  }
+  for (const flower of flowers) {
+    const hasPetal = cells.some((cell) => cell.flowerId === flower.id && cell.label === 'petal');
+    const hasCentre = cells.some((cell) => cell.flowerId === flower.id && cell.label === 'centre');
+    if (hasPetal && !hasCentre) stampCentre(cells, gridW, gridH, flower);
   }
 
-  // Repaint what the flowers did not cover, so the background stays a slow wash.
-  colorByLabel(cells, gridW, gridH, 'sky', LABEL_FAMILIES.sky, means, seed + 1, 'wash');
-  colorByLabel(cells, gridW, gridH, 'water', LABEL_FAMILIES.water, means, seed + 2, 'wash');
-  colorByLabel(cells, gridW, gridH, 'ground', LABEL_FAMILIES.ground, means, seed + 3, 'soft');
-
-  return { gridW, gridH, cells, centreFamilies };
+  if (vase) outlineVase(cells, gridW, vase);
+  colorByLabel(cells, gridW, gridH, means, seed);
+  colorFlowers(cells, gridW, flowers, means, seed);
+  return { gridW, gridH, cells, composition, centreFamilies };
 }
 
+/** Each bloom keeps its outer petal, a contrasting inner petal, and its centre. */
+function colorFlowers(
+  cells: SceneCell[],
+  gridW: number,
+  flowers: Flower[],
+  means: Record<string, Rgb>,
+  seed: number,
+): void {
+  const byId = new Map(flowers.map((flower) => [flower.id, flower]));
+  cells.forEach((cell, index) => {
+    const flower = byId.get(cell.flowerId);
+    if (!flower || (cell.label !== 'petal' && cell.label !== 'centre')) return;
+    let family = flower.centre;
+    if (cell.label === 'petal') {
+      const dx = (index % gridW) + 0.5 - flower.x;
+      const dy = Math.floor(index / gridW) + 0.5 - flower.y;
+      family = Math.hypot(dx, dy) < flower.radius * 0.5 ? flower.inner : flower.petal;
+    }
+    const rgb = means[family] ?? { r: 210, g: 170, b: 90 };
+    const painted = jitter(rgb, mulberry32((seed + index * 17) >>> 0), 6);
+    cell.r = painted.r;
+    cell.g = painted.g;
+    cell.b = painted.b;
+  });
+}
+
+type VaseGeom = { cx: number; top: number; bot: number; halfTop: number; halfBot: number };
+
+function vaseFor(seed: number, gridW: number, gridH: number): VaseGeom {
+  const rnd = mulberry32((seed ^ 0x51ed) || 1);
+  return {
+    cx: gridW * (0.22 + rnd() * 0.56),
+    top: gridH * (0.5 + rnd() * 0.1),
+    bot: gridH * 0.9,
+    halfTop: gridW * (0.04 + rnd() * 0.02),
+    halfBot: gridW * (0.065 + rnd() * 0.03),
+  };
+}
+
+function pointInVase(x: number, y: number, vase: VaseGeom): boolean {
+  if (y < vase.top || y > vase.bot) return false;
+  const t = (y - vase.top) / (vase.bot - vase.top || 1);
+  const half = vase.halfTop + (vase.halfBot - vase.halfTop) * t;
+  return Math.abs(x - vase.cx) <= half;
+}
+
+/** A one-cell green contour so the vase reads as an object on the wall. */
+function outlineVase(cells: SceneCell[], gridW: number, vase: VaseGeom): void {
+  for (let i = 0; i < cells.length; i += 1) {
+    const x = i % gridW;
+    const y = Math.floor(i / gridW);
+    if (cells[i]!.flowerId !== 0 || !pointInVase(x, y, vase)) continue;
+    const edge =
+      !pointInVase(x - 1, y, vase) ||
+      !pointInVase(x + 1, y, vase) ||
+      !pointInVase(x, y - 1, vase) ||
+      !pointInVase(x, y + 1, vase);
+    if (edge) cells[i]!.label = 'stem';
+  }
+}
+
+function horizonFor(composition: SceneComposition, gridH: number, rnd: () => number): number {
+  const span =
+    composition === 'meadow'
+      ? [0.08, 0.2]
+      : composition === 'field'
+        ? [0.42, 0.62]
+        : composition === 'hero'
+          ? [0.28, 0.46]
+          : [0, 0];
+  if (span[1] === 0) return gridH + 2;
+  return Math.round(gridH * (span[0] + rnd() * (span[1] - span[0])));
+}
+
+function backgroundFor(composition: SceneComposition): 'sky' | 'wall' | 'foliage' {
+  if (composition === 'vase' || composition === 'bouquet') return 'wall';
+  if (composition === 'meadow') return 'foliage';
+  return 'sky';
+}
+
+function placeFlowers(
+  composition: SceneComposition,
+  gridW: number,
+  gridH: number,
+  horizon: number,
+  rnd: () => number,
+  vase: VaseGeom | null,
+): Flower[] {
+  const shapes: FlowerShape[] = ['daisy', 'tulip', 'poppy', 'rose', 'cluster'];
+  const count =
+    composition === 'meadow'
+      ? 14 + Math.floor(rnd() * 8)
+      : composition === 'bouquet'
+        ? 4 + Math.floor(rnd() * 2)
+        : composition === 'vase'
+          ? 4 + Math.floor(rnd() * 3)
+          : composition === 'hero'
+            ? 1
+            : 5 + Math.floor(rnd() * 4);
+  const petals = paletteFor(composition, rnd);
+  const flowers: Flower[] = [];
+  let guard = 0;
+  while (flowers.length < count && guard < 400) {
+    guard += 1;
+    const i = flowers.length;
+    const radius =
+      composition === 'meadow'
+        ? 1.7 + rnd() * 1.5
+        : composition === 'bouquet'
+          ? 6.2 + rnd() * 3.2
+          : composition === 'hero'
+            ? 8 + rnd() * 2.4
+            : composition === 'vase'
+              ? 3.4 + rnd() * 2.2
+              : 2.6 + rnd() * 2.4;
+    let x = radius + 1 + rnd() * (gridW - radius * 2 - 2);
+    let y = radius + 1 + rnd() * (gridH - radius * 2 - 2);
+    if (composition === 'field' || composition === 'hero') {
+      y = Math.max(horizon + radius * 0.4, y);
+    }
+    if (composition === 'vase' && vase) {
+      x = vase.cx + (rnd() - 0.5) * gridW * 0.34;
+      y = vase.top - flowerRadiusRoom(radius, rnd);
+    }
+    if (composition === 'bouquet') {
+      x = gridW * (0.22 + rnd() * 0.56);
+      y = gridH * (0.22 + rnd() * 0.56);
+    }
+    if (composition === 'hero' && flowers.length === 0) {
+      x = gridW * (0.26 + rnd() * 0.48);
+      y = gridH * (0.32 + rnd() * 0.28);
+    }
+    x = Math.max(radius + 0.5, Math.min(gridW - radius - 0.5, x));
+    y = Math.max(radius + 0.5, Math.min(gridH - radius - 0.5, y));
+    const clash = flowers.some((other) => {
+      const dx = other.x - x;
+      const dy = other.y - y;
+      const min = (other.radius + radius) * (composition === 'bouquet' ? 0.55 : 0.7);
+      return dx * dx + dy * dy < min * min;
+    });
+    if (clash && guard < 320) continue;
+    const petal = petals[i % petals.length]!;
+    flowers.push(makeFlower(flowers.length + 1, x, y, radius, rnd() * Math.PI, petal, shapes[Math.floor(rnd() * shapes.length)]!, rnd));
+  }
+  for (const petal of petals) {
+    if (flowers.some((flower) => flower.petal === petal || flower.inner === petal)) continue;
+    const radius = composition === 'meadow' ? 1.6 : 2.2;
+    flowers.push(
+      makeFlower(
+        flowers.length + 1,
+        radius + rnd() * (gridW - radius * 2),
+        radius + rnd() * (gridH - radius * 2),
+        radius,
+        rnd() * Math.PI,
+        petal,
+        'daisy',
+        rnd,
+      ),
+    );
+  }
+  if (composition === 'hero' && flowers[0]) {
+    const hero = flowers[0];
+    hero.petal = rnd() < 0.5 ? 'yellow' : 'cream';
+    hero.inner = 'poppy';
+    hero.centre = 'orange';
+    const buds = ['blush', 'cream', 'yellow'] as const;
+    for (let bud = 0; bud < buds.length; bud += 1) {
+      const petal = buds[bud]!;
+      flowers.push({
+        id: flowers.length + 1,
+        x: gridW * (0.16 + bud * 0.28) + rnd() * 3,
+        y: gridH * (0.58 + rnd() * 0.12),
+        radius: 1.8 + rnd() * 0.8,
+        angle: rnd() * Math.PI,
+        petal,
+        inner: innerPetal(petal),
+        centre: centreFamiliesForPetal(petal)[0]!,
+        shape: 'tulip',
+      });
+    }
+  }
+  return flowers;
+}
+
+function innerPetal(petal: string): string {
+  if (petal === 'poppy' || petal === 'red' || petal === 'pink') return 'yellow';
+  if (petal === 'midblue') return 'cream';
+  if (petal === 'orange') return 'cream';
+  return 'poppy';
+}
+
+function makeFlower(
+  id: number,
+  x: number,
+  y: number,
+  radius: number,
+  angle: number,
+  petal: string,
+  shape: FlowerShape,
+  rnd: () => number,
+): Flower {
+  return {
+    id,
+    x,
+    y,
+    radius,
+    angle,
+    petal,
+    inner: innerPetal(petal),
+    centre: centreFamiliesForPetal(petal)[Math.floor(rnd() * 3) % centreFamiliesForPetal(petal).length]!,
+    shape,
+  };
+}
+
+function paletteFor(composition: SceneComposition, rnd: () => number): string[] {
+  const pools: Record<SceneComposition, string[]> = {
+    meadow: ['yellow', 'cream', 'blush', 'orange', 'pink', 'poppy', 'midblue'],
+    bouquet: ['poppy', 'red', 'orange', 'midblue', 'pink'],
+    vase: ['poppy', 'red', 'orange', 'midblue', 'pink'],
+    hero: ['yellow', 'cream', 'blush', 'orange'],
+    field: ['cream', 'blush', 'yellow', 'cream', 'blush', 'poppy'],
+  };
+  const pool = pools[composition].slice();
+  for (let i = pool.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rnd() * (i + 1));
+    [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+  }
+  if (composition !== 'hero' && !pool.includes('poppy')) pool.unshift('poppy');
+  return pool;
+}
+
+function flowerRadiusRoom(radius: number, rnd: () => number): number {
+  return radius * (0.7 + rnd() * 0.5);
+}
+
+function stampFlower(cells: SceneCell[], gridW: number, gridH: number, flower: Flower): void {
+  const reach = flower.radius * (flower.shape === 'tulip' ? 1.15 : 1.45);
+  const x0 = Math.max(0, Math.floor(flower.x - reach - 1));
+  const x1 = Math.min(gridW - 1, Math.ceil(flower.x + reach + 1));
+  const y0 = Math.max(0, Math.floor(flower.y - reach - 1));
+  const y1 = Math.min(gridH - 1, Math.ceil(flower.y + reach + 1));
+  for (let y = y0; y <= y1; y += 1) {
+    for (let x = x0; x <= x1; x += 1) {
+      const dx = x + 0.5 - flower.x;
+      const dy = y + 0.5 - flower.y;
+      const ang = Math.atan2(dy, dx) - flower.angle;
+      if (!insideBloom(flower, dx, dy, ang)) continue;
+      const cell = cells[y * gridW + x]!;
+      cell.label = 'petal';
+      cell.flowerId = flower.id;
+    }
+  }
+  stampLeaf(cells, gridW, gridH, flower);
+}
+
+function insideBloom(flower: Flower, dx: number, dy: number, ang: number): boolean {
+  const dist = Math.hypot(dx, dy);
+  if (flower.shape === 'daisy') {
+    const lobes = 0.55 + 0.45 * Math.cos(ang * 8);
+    return dist < flower.radius * (0.35 + lobes);
+  }
+  if (flower.shape === 'tulip') {
+    const cup = Math.exp(-((ang * 1.1) ** 2) / 0.9);
+    return dy < flower.radius * 0.85 && dist < flower.radius * (0.55 + cup * 0.7);
+  }
+  if (flower.shape === 'poppy') {
+    const lobes = 0.72 + 0.28 * Math.cos(ang * 4);
+    return dist < flower.radius * lobes;
+  }
+  if (flower.shape === 'rose') {
+    const spiral = 0.45 + 0.55 * (0.5 + 0.5 * Math.cos(ang * 5 + dist));
+    return dist < flower.radius * spiral;
+  }
+  const cluster = 0.4 + 0.6 * Math.abs(Math.cos(ang * 3));
+  return dist < flower.radius * cluster;
+}
+
+function stampLeaf(cells: SceneCell[], gridW: number, gridH: number, flower: Flower): void {
+  const ox = flower.x + Math.cos(flower.angle) * flower.radius * 1.3;
+  const oy = flower.y + Math.sin(flower.angle) * flower.radius * 0.5;
+  const x0 = Math.max(0, Math.floor(ox - flower.radius));
+  const x1 = Math.min(gridW - 1, Math.ceil(ox + flower.radius));
+  const y0 = Math.max(0, Math.floor(oy - flower.radius * 0.6));
+  const y1 = Math.min(gridH - 1, Math.ceil(oy + flower.radius * 0.6));
+  for (let y = y0; y <= y1; y += 1) {
+    for (let x = x0; x <= x1; x += 1) {
+      const dx = (x + 0.5 - ox) / (flower.radius * 0.85);
+      const dy = (y + 0.5 - oy) / (flower.radius * 0.42);
+      if (dx * dx + dy * dy > 1) continue;
+      const cell = cells[y * gridW + x]!;
+      if (cell.flowerId !== 0) continue;
+      cell.label = 'leaf';
+      cell.flowerId = flower.id;
+    }
+  }
+}
+
+function stampCentre(cells: SceneCell[], gridW: number, gridH: number, flower: Flower): void {
+  const rad = Math.max(1.05, flower.radius * (flower.shape === 'daisy' ? 0.34 : 0.28));
+  const x0 = Math.max(0, Math.floor(flower.x - rad));
+  const x1 = Math.min(gridW - 1, Math.ceil(flower.x + rad));
+  const y0 = Math.max(0, Math.floor(flower.y - rad));
+  const y1 = Math.min(gridH - 1, Math.ceil(flower.y + rad));
+  let painted = 0;
+  for (let y = y0; y <= y1; y += 1) {
+    for (let x = x0; x <= x1; x += 1) {
+      const dx = x + 0.5 - flower.x;
+      const dy = y + 0.5 - flower.y;
+      if (dx * dx + dy * dy > rad * rad) continue;
+      const cell = cells[y * gridW + x]!;
+      if (cell.flowerId !== flower.id && cell.flowerId !== 0) continue;
+      cell.label = 'centre';
+      cell.flowerId = flower.id;
+      painted += 1;
+    }
+  }
+  if (painted > 0) return;
+  let best = -1;
+  let bestD = Infinity;
+  for (let i = 0; i < cells.length; i += 1) {
+    if (cells[i]!.flowerId !== flower.id) continue;
+    const dx = (i % gridW) + 0.5 - flower.x;
+    const dy = Math.floor(i / gridW) + 0.5 - flower.y;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  if (best >= 0) {
+    cells[best]!.label = 'centre';
+    cells[best]!.flowerId = flower.id;
+  }
+}
+
+/**
+ * Colour a label with a soft dither between neighbouring families.
+ * The decision is shared by a 3×3 block, so the wash reads as a gradient
+ * and a single row never flips family all at once.
+ */
 function colorByLabel(
   cells: SceneCell[],
   gridW: number,
   gridH: number,
-  label: SceneLabel,
-  families: readonly string[],
   means: Record<string, Rgb>,
   seed: number,
-  kind: 'wash' | 'soft',
-) {
-  const usable = families.filter((f) => means[f]);
-  if (usable.length === 0) return;
-  const indices: number[] = [];
-  for (let i = 0; i < cells.length; i++) if (cells[i]!.label === label) indices.push(i);
-  if (indices.length === 0) return;
-  const field = (index: number) => {
-    const y = Math.floor(index / gridW);
-    const x = index - y * gridW;
-    const drift = fbm(x * 0.055, y * 0.055, seed);
-    if (kind === 'wash') return y / gridH + (drift - 0.5) * 0.22;
-    return drift;
-  };
-  const ordered = [...indices].sort((a, b) => field(a) - field(b) || a - b);
-  const bands = usable.length;
-  const base = Math.floor(ordered.length / bands);
-  let extra = ordered.length - base * bands;
-  let cursor = 0;
-  for (const family of usable) {
-    const count = base + (extra > 0 ? 1 : 0);
-    if (extra > 0) extra--;
-    const rgb = means[family]!;
-    for (let k = 0; k < count; k++) {
-      const cell = cells[ordered[cursor++]!]!;
-      cell.r = rgb.r;
-      cell.g = rgb.g;
-      cell.b = rgb.b;
-    }
+): void {
+  const groups = new Map<SceneLabel, number[]>();
+  cells.forEach((cell, index) => {
+    const list = groups.get(cell.label) ?? [];
+    list.push(index);
+    groups.set(cell.label, list);
+  });
+
+  for (const [label, indexes] of groups) {
+    if (label === 'petal' || label === 'centre') continue;
+    const families = LABEL_FAMILIES[label];
+    const tone = indexes.map((index) => {
+      const x = index % gridW;
+      const y = Math.floor(index / gridW);
+      if (label === 'leaf' || label === 'stem') return fbm(x / 32, y / 26, seed + 5);
+      const tilt = (hash01(3, 5, seed) - 0.5) * 1.1;
+      const phase = hash01(7, 1, seed) * 0.7;
+      return ((y / gridH) + phase + (x / gridW) * tilt) * 0.75 + fbm(x / 36, y / 30, seed + 9) * 0.25;
+    });
+    const ranked = indexes
+      .map((index, order) => ({ index, tone: tone[order]! }))
+      .sort((a, b) => a.tone - b.tone || a.index - b.index);
+    const pickByIndex = balancedFamilyPicks(ranked, families.length, gridW, seed + label.length);
+    indexes.forEach((index) => {
+      const pick = pickByIndex.get(index) ?? 0;
+      const rgb = means[families[pick]!] ?? { r: 180, g: 170, b: 150 };
+      const painted = jitter(rgb, mulberry32((seed + index * 13) >>> 0), 3);
+      const cell = cells[index]!;
+      cell.r = painted.r;
+      cell.g = painted.g;
+      cell.b = painted.b;
+    });
   }
-  dissolveSpecks(cells, gridW, gridH, label, usable, means);
 }
 
-/** Drop isolated background tiles so neighbours usually share a family. */
-function dissolveSpecks(
-  cells: SceneCell[],
+/** Quantile bands with a balanced Bayer handoff, so each family keeps an equal share. */
+function balancedFamilyPicks(
+  ranked: { index: number; tone: number }[],
+  count: number,
   gridW: number,
-  gridH: number,
-  label: SceneLabel,
-  families: readonly string[],
-  means: Record<string, Rgb>,
-) {
-  const familyOf = (cell: SceneCell) => {
-    let best = families[0]!;
-    let bestD = Infinity;
-    for (const family of families) {
-      const rgb = means[family]!;
-      const d = (cell.r - rgb.r) ** 2 + (cell.g - rgb.g) ** 2 + (cell.b - rgb.b) ** 2;
-      if (d < bestD) {
-        bestD = d;
-        best = family;
-      }
-    }
-    return best;
-  };
-  for (let pass = 0; pass < 2; pass++) {
-    const assigned = cells.map((cell) => (cell.label === label ? familyOf(cell) : ''));
-    for (let y = 0; y < gridH; y++) {
-      for (let x = 0; x < gridW; x++) {
-        const index = y * gridW + x;
-        if (cells[index]!.label !== label) continue;
-        const votes = new Map<string, number>();
-        for (const [dx, dy] of [
-          [1, 0],
-          [-1, 0],
-          [0, 1],
-          [0, -1],
-        ] as const) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx < 0 || ny < 0 || nx >= gridW || ny >= gridH) continue;
-          const neighbour = assigned[ny * gridW + nx]!;
-          if (!neighbour) continue;
-          votes.set(neighbour, (votes.get(neighbour) ?? 0) + 1);
-        }
-        let winner = assigned[index]!;
-        let winnerN = 0;
-        for (const [family, n] of votes) {
-          if (n > winnerN) {
-            winner = family;
-            winnerN = n;
-          }
-        }
-        const own = votes.get(assigned[index]!) ?? 0;
-        if (winnerN >= 3 && winner !== assigned[index] && own <= 1) {
-          const rgb = means[winner]!;
-          cells[index]!.r = rgb.r;
-          cells[index]!.g = rgb.g;
-          cells[index]!.b = rgb.b;
-        }
-      }
-    }
+  seed: number,
+): Map<number, number> {
+  const picks = new Map<number, number>();
+  const total = ranked.length;
+  if (total === 0) return picks;
+  ranked.forEach((item, rank) => {
+    picks.set(item.index, Math.min(count - 1, Math.floor((rank * count) / total)));
+  });
+  if (count <= 1) return picks;
+  const feather = total < 90 ? 1 : Math.max(4, Math.floor(total * 0.11));
+  for (let edge = 1; edge < count; edge += 1) {
+    const cut = Math.floor((edge * total) / count);
+    const from = Math.max(0, cut - feather);
+    const to = Math.min(total, cut + feather);
+    const window = ranked.slice(from, to);
+    if (window.length < 2) continue;
+    const scored = window.map((item, order) => {
+      const x = item.index % gridW;
+      const y = Math.floor(item.index / gridW);
+      const bx = Math.floor(x / 3);
+      const by = Math.floor(y / 3);
+      const wobble = (fbm(bx / 7, by / 6, seed + edge * 13) - 0.5) * 0.35;
+      const threshold = (BAYER[by & 3]![bx & 3]! + 0.5) / 16 + wobble;
+      const frac = order / (window.length - 1);
+      return { index: item.index, score: frac - threshold };
+    });
+    scored.sort((a, b) => a.score - b.score || a.index - b.index);
+    const upper = Math.round(window.length / 2);
+    scored.forEach((row, order) => {
+      picks.set(row.index, order >= scored.length - upper ? edge : edge - 1);
+    });
   }
-}
-
-function shuffle<T>(list: readonly T[], rnd: () => number): T[] {
-  const arr = [...list];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(rnd() * (i + 1));
-    const tmp = arr[i]!;
-    arr[i] = arr[j]!;
-    arr[j] = tmp;
-  }
-  return arr;
+  return picks;
 }

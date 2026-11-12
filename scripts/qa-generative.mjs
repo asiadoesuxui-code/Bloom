@@ -56,8 +56,8 @@ function checkScene(seed) {
 
   let flowerL = 0;
   let flowerN = 0;
-  let groundL = 0;
-  let groundN = 0;
+  const regionL = new Map();
+  const regionN = new Map();
 
   for (let i = 0; i < painted.cells.length; i++) {
     const src = painted.cells[i];
@@ -79,9 +79,9 @@ function checkScene(seed) {
         flowers.set(src.flowerId, row);
       }
     }
-    if (src.label === 'sky' || src.label === 'water' || src.label === 'ground') {
-      groundL += lab.L;
-      groundN += 1;
+    if (BG_LABELS.has(src.label)) {
+      regionL.set(src.label, (regionL.get(src.label) ?? 0) + lab.L);
+      regionN.set(src.label, (regionN.get(src.label) ?? 0) + 1);
     }
 
     if ((src.label === 'water' || src.label === 'sky') && WARM.has(key)) {
@@ -142,7 +142,7 @@ function checkScene(seed) {
   }
 
   for (const [label, keys] of byLabel) {
-    if (keys.length < MIN_REGION) continue;
+    if (!BG_LABELS.has(label) || keys.length < MIN_REGION) continue;
     const counts = new Map();
     for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1);
     for (const [key, n] of counts) {
@@ -153,9 +153,23 @@ function checkScene(seed) {
     }
   }
 
-  const gap = flowerN && groundN ? Math.abs(flowerL / flowerN - groundL / groundN) : 0;
+  let backdrop = 'leaf';
+  let backdropN = 0;
+  for (const label of BG_LABELS) {
+    const n = regionN.get(label) ?? 0;
+    if (n > backdropN) {
+      backdrop = label;
+      backdropN = n;
+    }
+  }
+  const gap =
+    flowerN && backdropN ? Math.abs(flowerL / flowerN - regionL.get(backdrop) / backdropN) : 0;
   if (gap < MIN_LIGHTNESS_GAP) {
-    failures.push(`flower/background lightness gap ${gap.toFixed(3)} < ${MIN_LIGHTNESS_GAP}`);
+    const flowerMean = flowerL / flowerN;
+    const backMean = regionL.get(backdrop) / backdropN;
+    failures.push(
+      `flower/background lightness gap ${gap.toFixed(3)} < ${MIN_LIGHTNESS_GAP} (${backdrop} ${backMean.toFixed(3)} vs flower ${flowerMean.toFixed(3)})`,
+    );
   }
 
   for (const [id, row] of flowers) {
@@ -163,12 +177,89 @@ function checkScene(seed) {
   }
   if (flowers.size < 4) failures.push(`only ${flowers.size} flowers`);
 
+  for (const label of BG_LABELS) {
+    const keys = byLabel.get(label);
+    if (keys?.includes('brown')) failures.push(`${label} used brown`);
+  }
+  if (sharpBand(painted, keyAt)) failures.push('sharp background band');
+
   const used = new Set(built.map((cell) => colorKey(cell.url)));
   for (const required of ['forest', 'midblue', 'cream', 'blush', 'poppy']) {
     if (!used.has(required)) failures.push(`missing palette colour ${required}`);
   }
 
-  return { seed, failures: [...new Set(failures)], built, painted, gap, bgBusy, flowerBusy };
+  return {
+    seed,
+    failures: [...new Set(failures)],
+    built,
+    painted,
+    gap,
+    bgBusy,
+    flowerBusy,
+    composition: painted.composition,
+    signature: sceneSignature(painted, keyAt),
+  };
+}
+
+function sceneSignature(painted, keyAt) {
+  const cols = 10;
+  const rows = 6;
+  const tokens = [];
+  for (let by = 0; by < rows; by += 1) {
+    for (let bx = 0; bx < cols; bx += 1) {
+      const x = Math.min(GRID_W - 1, Math.floor(((bx + 0.5) * GRID_W) / cols));
+      const y = Math.min(GRID_H - 1, Math.floor(((by + 0.5) * GRID_H) / rows));
+      const i = y * GRID_W + x;
+      const cell = painted.cells[i];
+      tokens.push(`${cell.flowerId ? 'F' : cell.label}:${keyAt[i]}`);
+    }
+  }
+  return tokens;
+}
+
+function sharpBand(painted, keyAt) {
+  for (const label of BG_LABELS) {
+    for (let y = 0; y < GRID_H - 1; y += 1) {
+      let compared = 0;
+      let switched = 0;
+      const top = new Map();
+      const bot = new Map();
+      for (let x = 0; x < GRID_W; x += 1) {
+        const a = y * GRID_W + x;
+        const b = (y + 1) * GRID_W + x;
+        if (painted.cells[a].label !== label || painted.cells[b].label !== label) continue;
+        compared += 1;
+        top.set(keyAt[a], (top.get(keyAt[a]) ?? 0) + 1);
+        bot.set(keyAt[b], (bot.get(keyAt[b]) ?? 0) + 1);
+        if (keyAt[a] !== keyAt[b]) switched += 1;
+      }
+      if (compared < 24) continue;
+      const topMode = modeShare(top, compared);
+      const botMode = modeShare(bot, compared);
+      if (topMode.share > 0.7 && botMode.share > 0.7 && topMode.key !== botMode.key && switched / compared > 0.62) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function modeShare(counts, total) {
+  let key = '';
+  let n = 0;
+  for (const [name, count] of counts) {
+    if (count > n) {
+      key = name;
+      n = count;
+    }
+  }
+  return { key, share: total ? n / total : 0 };
+}
+
+function agreement(a, b) {
+  let same = 0;
+  for (let i = 0; i < a.length; i += 1) if (a[i] === b[i]) same += 1;
+  return same / a.length;
 }
 
 const results = [];
@@ -177,15 +268,32 @@ for (let n = 0; n < SEEDS; n++) {
   results.push(checkScene(seed));
 }
 
+const compositions = new Set(results.map((row) => row.composition));
+for (const name of ['meadow', 'bouquet', 'vase', 'hero', 'field']) {
+  if (!compositions.has(name)) {
+    results[0].failures.push(`missing composition ${name}`);
+  }
+}
+let closest = 0;
+for (let i = 0; i < results.length; i += 1) {
+  for (let j = i + 1; j < results.length; j += 1) {
+    const score = agreement(results[i].signature, results[j].signature);
+    if (score > closest) closest = score;
+    if (score > 0.82) {
+      results[i].failures.push(`near-duplicate of ${results[j].seed} (${score.toFixed(2)})`);
+    }
+  }
+}
 const failed = results.filter((row) => row.failures.length > 0);
+console.log(`closest pair ${closest.toFixed(3)}  compositions ${[...compositions].join(', ')}`);
 console.log(`seeds ${results.length}  failed ${failed.length}`);
-console.log('| seed | result | notes |');
-console.log('| --- | --- | --- |');
+console.log('| seed | composition | result | notes |');
+console.log('| --- | --- | --- | --- |');
 for (const row of results) {
   const notes = row.failures.length
     ? row.failures.slice(0, 3).join('; ')
     : `gap ${row.gap.toFixed(3)} bg ${row.bgBusy.toFixed(3)} flower ${row.flowerBusy.toFixed(3)}`;
-  console.log(`| ${row.seed} | ${row.failures.length ? 'fail' : 'pass'} | ${notes} |`);
+  console.log(`| ${row.seed} | ${row.composition} | ${row.failures.length ? 'fail' : 'pass'} | ${notes} |`);
 }
 
 const cell = 3;
