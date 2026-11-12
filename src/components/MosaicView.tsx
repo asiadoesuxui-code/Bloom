@@ -11,7 +11,6 @@ import {
 import { getLivingMotionParams } from '../animations/tileLiving';
 import { revealGsParamsFromSeed, revealMicroFromSeed } from '../animations/tileReveal';
 import type { MosaicCell } from '../lib/mosaic';
-import { GRID_H, GRID_W } from '../lib/waveOrder';
 import { HandRippleTileShell, tileFlatIndex, useHandRippleRegister } from '../handTracking/HandRippleContext';
 
 export type MosaicViewProps = {
@@ -22,12 +21,19 @@ export type MosaicViewProps = {
   emptyLabel: string;
   /** Wrap tiles with hand ripple shell (expects HandRippleProvider above) */
   handTileRipple?: boolean;
+  gridW: number;
+  gridH: number;
+  /** Fired once per tile when its reveal animation has landed. */
+  onTileLanded?: () => void;
 };
 
 type TileProps = {
   cell: MosaicCell;
   living: boolean;
   rippleShell: boolean;
+  gridW: number;
+  gridH: number;
+  onTileLanded?: () => void;
 };
 
 const LIVING_LAYER: CSSProperties = {
@@ -38,77 +44,91 @@ const LIVING_LAYER: CSSProperties = {
   borderRadius: 2,
 };
 
-const BloomTile = memo(function BloomTile({ cell, living, rippleShell }: TileProps) {
+const BloomTile = memo(function BloomTile({ cell, living, rippleShell, gridW, gridH, onTileLanded }: TileProps) {
   const { cx, cy, url, delaySec, seed } = cell;
-  const livingOn = living;
   const livingParams = useMemo(() => getLivingMotionParams(seed), [seed]);
-  const popsAboveGrid = livingOn && livingParams.kind !== 'static';
   const handRipple = useHandRippleRegister();
+  const dampenRef = useRef(handRipple?.livingDampen);
+  dampenRef.current = handRipple?.livingDampen;
 
+  const cellRef = useRef<HTMLDivElement>(null);
+  const revealRef = useRef<HTMLDivElement>(null);
   const livingScaleRef = useRef<HTMLDivElement>(null);
+  const onLandedRef = useRef(onTileLanded);
+  onLandedRef.current = onTileLanded;
 
   useEffect(() => {
-    const el = livingScaleRef.current;
-    if (!el) return;
+    const scaleEl = livingScaleRef.current;
+    const revealEl = revealRef.current;
+    const cellEl = cellRef.current;
+    if (!scaleEl || !revealEl) return;
+
+    let tween: gsap.core.Tween | undefined;
+    let tickBlend: (() => void) | undefined;
+    let started = false;
 
     const reset = () => {
-      gsap.killTweensOf(el);
-      gsap.set(el, {
-        scale: 1,
-        z: 0,
-        force3D: true,
-      });
+      tween?.kill();
+      tween = undefined;
+      gsap.killTweensOf(scaleEl);
+      gsap.set(scaleEl, { scale: 1, z: 0, force3D: true });
     };
 
-    if (!livingOn) {
-      reset();
-      return;
-    }
+    const start = () => {
+      if (started) return;
+      started = true;
+      const p = livingParams;
+      if (p.kind !== 'static' && cellEl) {
+        cellEl.style.overflow = 'visible';
+        cellEl.style.zIndex = String(4 + (seed & 31));
+      }
+      if (p.kind !== 'static') {
+        const zPeak = p.kind === 'pulse' ? 8 + (seed & 7) * 1.8 : 16 + (seed & 7) * 2.8;
+        const ease = p.kind === 'pulse' ? 'power2.inOut' : 'power3.inOut';
+        gsap.set(scaleEl, { transformOrigin: '50% 50%', force3D: true });
+        // Rest pose matches the reveal's last frame, then the swell begins at once.
+        tween = gsap.fromTo(
+          scaleEl,
+          { scale: 1, z: 0 },
+          {
+            scale: p.scalePeak,
+            z: zPeak,
+            duration: p.scaleHalfSec,
+            delay: 0,
+            ease,
+            repeat: -1,
+            yoyo: true,
+            force3D: true,
+          },
+        );
+        const dIdx = tileFlatIndex(cx, cy, gridW);
+        if (tween) {
+          const tw = tween;
+          tickBlend = () => {
+            const inf = dampenRef.current?.[dIdx] ?? 0;
+            tw.timeScale(0.06 + 0.94 * (1 - Math.min(1, inf)));
+          };
+          gsap.ticker.add(tickBlend);
+        }
+      }
+      onLandedRef.current?.();
+    };
 
-    const p = livingParams;
-    if (p.kind === 'static') {
-      reset();
-      return;
-    }
-
-    const zPeak = p.kind === 'pulse' ? 8 + (seed & 7) * 1.8 : 16 + (seed & 7) * 2.8;
-
-    gsap.set(el, { transformOrigin: '50% 50%', force3D: true });
-
-    const ease = p.kind === 'pulse' ? 'power2.inOut' : 'power3.inOut';
-    /** Only transform props (GPU); skip box-shadow — it repaints every frame and tanks 2k tiles */
-    const tw = gsap.fromTo(
-      el,
-      { scale: 1, z: 0 },
-      {
-        scale: p.scalePeak,
-        z: zPeak,
-        duration: p.scaleHalfSec,
-        delay: p.scalePhaseSec,
-        ease,
-        repeat: -1,
-        yoyo: true,
-        force3D: true,
-      },
-    );
-
-    const dampenBuf = handRipple?.livingDampen;
-    const dIdx = tileFlatIndex(cx, cy);
-    let tickBlend: (() => void) | undefined;
-    if (dampenBuf) {
-      tickBlend = () => {
-        const inf = dampenBuf[dIdx] ?? 0;
-        tw.timeScale(0.06 + 0.94 * (1 - Math.min(1, inf)));
-      };
-      gsap.ticker.add(tickBlend);
-    }
+    const onEnd = (event: AnimationEvent) => {
+      if (event.target !== revealEl || event.animationName !== 'bloomTileReveal') return;
+      start();
+    };
+    revealEl.addEventListener('animationend', onEnd);
+    const params = revealGsParamsFromSeed(seed, delaySec);
+    const backup = window.setTimeout(start, (params.delaySec + params.transformDur) * 1000 + 24);
 
     return () => {
+      revealEl.removeEventListener('animationend', onEnd);
+      window.clearTimeout(backup);
       if (tickBlend) gsap.ticker.remove(tickBlend);
-      tw.kill();
       reset();
     };
-  }, [livingOn, seed, livingParams, cx, cy, handRipple?.livingDampen]);
+  }, [seed, delaySec, livingParams, cx, cy, gridW]);
 
   const livingLayer = (
     <div ref={livingScaleRef} style={LIVING_LAYER}>
@@ -129,17 +149,18 @@ const BloomTile = memo(function BloomTile({ cell, living, rippleShell }: TilePro
 
   return (
     <div
+      ref={cellRef}
       style={{
         position: 'absolute',
-        left: `${(cx * 100) / GRID_W}%`,
-        top: `${(cy * 100) / GRID_H}%`,
-        width: `${100 / GRID_W}%`,
-        height: `${100 / GRID_H}%`,
-        overflow: popsAboveGrid ? 'visible' : 'hidden',
-        zIndex: popsAboveGrid ? 4 + (seed & 31) : undefined,
+        left: `${(cx * 100) / gridW}%`,
+        top: `${(cy * 100) / gridH}%`,
+        width: `${100 / gridW}%`,
+        height: `${100 / gridH}%`,
+        overflow: 'hidden',
       }}
     >
       <div
+        ref={revealRef}
         data-bloom-reveal
         data-delay={delaySec}
         data-seed={seed}
@@ -148,10 +169,11 @@ const BloomTile = memo(function BloomTile({ cell, living, rippleShell }: TilePro
           height: '100%',
           transformOrigin: '50% 50%',
           backfaceVisibility: 'hidden',
+          perspective: 900,
         }}
       >
         {rippleShell ? (
-          <HandRippleTileShell cx={cx} cy={cy} rippleActive={livingOn}>
+          <HandRippleTileShell cx={cx} cy={cy} rippleActive={living}>
             {livingLayer}
           </HandRippleTileShell>
         ) : (
@@ -201,6 +223,9 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
     living,
     emptyLabel,
     handTileRipple = false,
+    gridW,
+    gridH,
+    onTileLanded,
   },
   ref,
 ) {
@@ -225,6 +250,9 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
         borderRadius: 10,
         overflow: 'hidden',
         boxShadow: '0 24px 80px rgba(0,0,0,0.45)',
+        touchAction: 'pinch-zoom',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
       }}
     >
       {hasTiles ? (
@@ -235,10 +263,6 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
             position: 'relative',
             width: '100%',
             height: '100%',
-            /** 3D stacking only when living kicks in (~GSAP z). */
-            ...(living
-              ? { perspective: 900, transformStyle: 'preserve-3d' as const }
-              : {}),
           }}
         >
           {cells.map((cell) => (
@@ -247,6 +271,9 @@ export const MosaicView = forwardRef<HTMLDivElement, MosaicViewProps>(function M
               cell={cell}
               living={living}
               rippleShell={handTileRipple}
+              gridW={gridW}
+              gridH={gridH}
+              onTileLanded={onTileLanded}
             />
           ))}
         </div>

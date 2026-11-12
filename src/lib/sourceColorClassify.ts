@@ -1,8 +1,194 @@
 import type { Oklab } from './colorSpace';
 
-/** Ceramic variant names that read visually blue — never use on leafy greens */
+/**
+ * Ceramic blues — `darkblue`, `lightblue`, and `midblue`.
+ * `seagreen` does not match. These stay off foliage unless the sample is actually blue.
+ */
 export function isBlueCeramicFamily(colorKey: string): boolean {
   return colorKey.toLowerCase().includes('blue');
+}
+
+/**
+ * A cell with a real green cast. Used to keep `forest` off charcoal and grey walls.
+ */
+export function isGreenLeaningSample(r: number, g: number, b: number): boolean {
+  const greenExcess = g - 0.5 * (r + b);
+  if (greenExcess < 10) return false;
+  if (b > g + 6) return false;
+  if (r > g + 14) return false;
+  return true;
+}
+
+/**
+ * Only the dark mass of a leaf. Mid-tone foliage stays on `green` / `lightgreen`
+ * so a field of pads does not collapse into `forest`.
+ */
+export function isDarkForestSample(r: number, g: number, b: number): boolean {
+  if (!isGreenLeaningSample(r, g, b)) return false;
+  const sum = r + g + b;
+  if (sum > 150) return false;
+  if (g > 72) return false;
+  return true;
+}
+
+/** Pink and magenta: blue participates, so these are not scarlet. */
+export function isPinkOrMagentaSample(r: number, g: number, b: number): boolean {
+  if (r < 90) return false;
+  if (b > g + 6 && r > g + 12 && r >= b - 30) return true;
+  if (b > 95 && g > 80 && r > g && r > b && b > r * 0.48 && r < 245 && g > 70) return true;
+  return false;
+}
+
+/**
+ * Blood red / poppy scarlet. Pink, magenta, orange, and gold fail this.
+ * `poppy` and `red` ceramics are legal only here.
+ */
+export function isTrueScarletSample(r: number, g: number, b: number): boolean {
+  if (isPinkOrMagentaSample(r, g, b)) return false;
+  if (r < 120) return false;
+  if (g > 140) return false;
+  if (r < g + 72) return false;
+  if (r < b + 58) return false;
+  if (b > g + 8) return false;
+  return true;
+}
+
+/**
+ * Soil, seed centres, and branches: warm, but red stays close to green.
+ * A saturated red, pink, or orange fails this.
+ */
+export function isGenuineBrownSample(r: number, g: number, b: number): boolean {
+  const spread = Math.max(r, g, b) - Math.min(r, g, b);
+  if (spread < 10 || spread > 72) return false;
+  if (r < 36 || g < 24) return false;
+  if (b > g + 6) return false;
+  if (g > r + 12) return false;
+  if (r > g + 32) return false;
+  return r > b + 8;
+}
+
+/**
+ * A red that is too dark or too shaded for `poppy`, but still red.
+ * Pink, gold, and genuine brown stay out.
+ */
+export function isShadedRedSample(r: number, g: number, b: number): boolean {
+  if (isPinkOrMagentaSample(r, g, b) || isGenuineBrownSample(r, g, b)) return false;
+  if (g > 88 && g > r * 0.58) return false;
+  if (r < 48 || r < g + 28 || r < b + 18) return false;
+  if (b > g + 12) return false;
+  return true;
+}
+
+/** Red, pink, and orange hues. Brown ceramics are the wrong family for these. */
+export function isRedPinkOrOrangeHue(r: number, g: number, b: number): boolean {
+  if (isGenuineBrownSample(r, g, b)) return false;
+  if (isPinkOrMagentaSample(r, g, b) || isTrueScarletSample(r, g, b) || isShadedRedSample(r, g, b)) return true;
+  return r > 80 && r > g + 8 && g > b + 12 && r > b + 28 && g > 40;
+}
+
+/** Foliage ceramics. `forest` belongs with `green`, `lightgreen`, and `seagreen`. */
+export function isLeafyGreenCeramicFamily(colorKey: string): boolean {
+  switch (colorKey.toLowerCase()) {
+    case 'green':
+    case 'lightgreen':
+    case 'seagreen':
+    case 'forest':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Deep `red` and bright `poppy` share the true-red gate. */
+export function isScarletCeramicFamily(colorKey: string): boolean {
+  const key = colorKey.toLowerCase();
+  return key === 'red' || key === 'poppy';
+}
+
+/** Pale petal and paper colours. They stay eligible only on the samples named below. */
+export function isLightNeutralCeramicFamily(colorKey: string): boolean {
+  const key = colorKey.toLowerCase();
+  return key === 'cream' || key === 'blush';
+}
+
+/** Blues and the teal ceramic. These stay off warm flowers. */
+export function isCoolCeramicFamily(colorKey: string): boolean {
+  switch (colorKey.toLowerCase()) {
+    case 'lightblue':
+    case 'midblue':
+    case 'darkblue':
+    case 'seagreen':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Paper white and off-white. Chroma is tiny and blue does not lead,
+ * so a pale sky does not qualify.
+ */
+export function isGenuineNearWhiteSample(r: number, g: number, b: number): boolean {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (r + g + b < 700) return false;
+  if (max - min > 16) return false;
+  if (min < 214) return false;
+  if (b > r + 3 || b > g + 3) return false;
+  return true;
+}
+
+/** A light cell with a blue cast: pale sky, not paper and not beige. */
+export function isPaleBlueSample(r: number, g: number, b: number): boolean {
+  if (b < 130) return false;
+  if (r + g + b < 380) return false;
+  if (b + 4 < r && b + 4 < g) return false;
+  return b >= r - 2 && b >= g - 6;
+}
+
+/**
+ * A light pink petal. Dusty beige has blue at or below green, so it stays beige.
+ * Pink lifts blue toward green.
+ */
+export function isPalePinkSample(r: number, g: number, b: number): boolean {
+  if (r + g + b < 520 || r < 175) return false;
+  if (r < g + 28 || r < b + 18) return false;
+  if (b < g + 8) return false;
+  if (b > r - 8) return false;
+  const spread = Math.max(r, g, b) - Math.min(r, g, b);
+  return spread >= 20 && spread < 95;
+}
+
+/** Red, orange, yellow, pink, or brown. Green leaves and blue sky fail this. */
+export function isWarmSample(r: number, g: number, b: number): boolean {
+  if (isClearlyBlueDominantSample(r, g, b) || isPaleBlueSample(r, g, b)) return false;
+  if (isGreenLeaningSample(r, g, b)) return false;
+  if (b > r + 12 && b > g + 8) return false;
+  if (g > r + 18 && g > b + 12) return false;
+  return r >= b - 2 && r + g > b * 1.55;
+}
+
+/**
+ * A shadow inside a warm flower: dark, with red clearly ahead of green and blue.
+ * A neutral or green shadow stays out, so foliage does not turn brown.
+ */
+export function isDarkWarmSample(r: number, g: number, b: number): boolean {
+  const sum = r + g + b;
+  if (sum > 320 || sum < 24) return false;
+  if (b > r + 6) return false;
+  if (g > r - 4) return false;
+  return r > g + 18 && r > b + 14;
+}
+
+/**
+ * A pale, weakly hued cell: cream paper, a white petal, a blush wash.
+ * Saturated blooms fall outside this, so cream and blush are not pushed onto them.
+ */
+export function isLightNeutralSample(r: number, g: number, b: number): boolean {
+  const sum = r + g + b;
+  if (sum < 460) return false;
+  const spread = Math.max(r, g, b) - Math.min(r, g, b);
+  return spread < 62;
 }
 
 /** `_brown`, `darkbrown`, etc. — confusable with dark greens in distance-only matching */
